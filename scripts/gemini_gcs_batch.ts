@@ -176,9 +176,14 @@ async function main() {
     const txt = await downloadGcsObject(BUCKET, o, accessToken);
     // assume JSONL lines with { key?, embedding? { values: [] } } or { embedding: { values: [] } }
     for (const line of txt.split(/\r?\n/).filter(Boolean)) {
-      try {
+        try {
         const obj = JSON.parse(line);
-        const vec = obj.embedding?.values || obj.embedding?.values || obj[0]?.embedding?.values || obj.embedding_values || null;
+        const vec =
+          obj.embedding?.values ||
+          obj.embeddings?.[0]?.values ||
+          obj[0]?.embedding?.values ||
+          obj.embedding_values ||
+          null;
         const id = obj.key || obj.id || crypto.randomUUID();
         if (Array.isArray(vec)) {
           embeddings.push({ id, vector: vec, payload: obj });
