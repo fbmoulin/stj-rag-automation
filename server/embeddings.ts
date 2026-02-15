@@ -184,8 +184,7 @@ export async function generateBatchEmbeddings(texts: string[]): Promise<number[]
           return null;
         }
         // Inline embeddings returned?
-        const inline = await res.json().catch(() => null);
-        const extracted = extractEmbeddingsFromOperationResponse(inline);
+        const extracted = extractEmbeddingsFromOperationResponse(body);
         if (extracted) {
           incMetric("embedding_batch_jobs_succeeded");
           return extracted;
