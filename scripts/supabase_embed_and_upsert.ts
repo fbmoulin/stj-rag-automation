@@ -108,7 +108,7 @@ async function upsertToQdrant(points: Array<{ id: string; vector: number[]; payl
   const url = `${QDRANT_URL}/collections/${collection}/points`;
   const body = { points };
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (QDRANT_API_KEY) headers["x-api-key"] = QDRANT_API_KEY;
+  if (QDRANT_API_KEY) headers["api-key"] = QDRANT_API_KEY;
   const res = await fetch(url, { method: "PUT", headers, body: JSON.stringify(body) });
   if (!res.ok) {
     const txt = await res.text();
