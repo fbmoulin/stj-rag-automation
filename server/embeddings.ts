@@ -273,10 +273,45 @@ export async function generateBatchEmbeddings(texts: string[]): Promise<number[]
   if (asyncResult && asyncResult.length === texts.length) {
     return asyncResult;
   }
-  // Async batch did not return a complete result — in async-only mode we abort here.
+  // Async batch did not return a complete result — fall back to per-item embedding with retries.
   incMetric("embedding_batch_jobs_failed_async");
-  logger.error("asyncBatchEmbedContent did not produce a complete result; aborting batch (async-only)");
-  throw new Error("asyncBatchEmbedContent failed or timed out; batch embedding aborted (async-only)");
+  logger.warn("asyncBatchEmbedContent did not produce a complete result; falling back to per-item embeddings");
+
+  // Per-item embedding fallback with concurrency and retries
+  const limit = pLimit(EMBEDDING_CONCURRENCY);
+  const results: (number[] | null)[] = await Promise.all(
+    texts.map((text, idx) =>
+      limit(async () => {
+        for (let attempt = 1; attempt <= Math.max(1, MAX_RETRIES); attempt++) {
+          try {
+            const emb = await generateEmbedding(text);
+            return emb;
+          } catch (err: any) {
+            logger.warn({ attempt, err: String(err), index: idx }, "per-item embedding failed, retrying");
+            if (attempt < Math.max(1, MAX_RETRIES)) {
+              const backoff = RETRY_BACKOFF_BASE_MS * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 100);
+              await new Promise((r) => setTimeout(r, backoff));
+            } else {
+              logger.error({ err: String(err), index: idx }, "per-item embedding exhausted retries");
+              return null;
+            }
+          }
+        }
+        return null;
+      })
+    )
+  );
+
+  const failed = results.filter((r) => r === null).length;
+  if (failed > 0) {
+    logger.error({ failed, total: texts.length }, "per-item fallback encountered failures");
+    incMetric("embedding_batch_jobs_failed_per_item");
+    throw new Error(`Per-item fallback failed for ${failed}/${texts.length} items`);
+  }
+
+  incMetric("embedding_batch_fallback_per_item_used");
+  // At this point, results are non-null arrays
+  return results.map((r) => r as number[]);
 }
 
 function extractEmbeddingsFromOperationResponse(resp: any): number[][] | null {
