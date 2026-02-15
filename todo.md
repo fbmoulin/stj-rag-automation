@@ -1,0 +1,26 @@
+# Project TODO
+
+- [ ] Database schema: datasets, extractions, documents, embeddings_jobs, rag_queries tables
+- [ ] Install dependencies: chromadb, google-genai, cloudscraper, pdf-parse, mammoth
+- [ ] Backend: STJ CKAN API integration with Cloudflare bypass (dataset listing, resource discovery)
+- [ ] Backend: Dataset download manager with incremental download and version control
+- [ ] Backend: JSON processor - extract legal fields (ementa, decisão, relator, órgão julgador)
+- [ ] Backend: Semantic chunking engine for long legal texts
+- [ ] Backend: Gemini embeddings generation and ChromaDB storage
+- [ ] Backend: Document upload handler (PDF, DOCX, TXT) with text extraction
+- [ ] Backend: RAG query engine - semantic search, reranking, contextual response generation
+- [ ] Backend: Extraction logs and audit trail
+- [ ] Frontend: Dark theme with orange gradient accents (Lex Intelligentia identity)
+- [ ] Frontend: Dashboard with dataset listing, status indicators, and extraction controls
+- [ ] Frontend: Dataset detail view with resources, download progress, and metadata
+- [ ] Frontend: Document upload interface with drag-and-drop
+- [ ] Frontend: RAG query interface with chat-like UX and source citations
+- [ ] Frontend: Extraction logs and history view
+- [ ] Frontend: Processing statistics and progress indicators
+- [ ] Tests: Backend API tests for extraction, processing, and RAG
+- [ ] ADAPT: Migrar de RAG simples para GraphRAG com grafo de conhecimento
+- [ ] GraphRAG: Extração de entidades jurídicas (ministros, processos, temas, legislação)
+- [ ] GraphRAG: Construção de grafo de relações entre entidades
+- [ ] GraphRAG: Detecção de comunidades e sumarização hierárquica
+- [ ] GraphRAG: Motor de consulta local (entidades específicas) e global (temas amplos)
+- [ ] GraphRAG: Visualização interativa do grafo de conhecimento no frontend

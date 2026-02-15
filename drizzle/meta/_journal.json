@@ -1,5 +1,27 @@
 {
   "version": "7",
   "dialect": "mysql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1771123144888,
+      "tag": "0000_lumpy_carmella_unuscione",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1771123279408,
+      "tag": "0001_optimal_lifeguard",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1771123909255,
+      "tag": "0002_glorious_spirit",
+      "breakpoints": true
+    }
+  ]
 }

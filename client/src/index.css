@@ -42,75 +42,78 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* Lex Intelligentia — Dark-first theme with orange gradient accents */
 :root {
-  --primary: var(--color-blue-700);
-  --primary-foreground: var(--color-blue-50);
-  --sidebar-primary: var(--color-blue-600);
-  --sidebar-primary-foreground: var(--color-blue-50);
-  --chart-1: var(--color-blue-300);
-  --chart-2: var(--color-blue-500);
-  --chart-3: var(--color-blue-600);
-  --chart-4: var(--color-blue-700);
-  --chart-5: var(--color-blue-800);
-  --radius: 0.65rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.235 0.015 65);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.235 0.015 65);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.235 0.015 65);
-  --secondary: oklch(0.98 0.001 286.375);
-  --secondary-foreground: oklch(0.4 0.015 65);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.141 0.005 285.823);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.623 0.214 259.815);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.235 0.015 65);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.623 0.214 259.815);
+  --radius: 0.625rem;
+  /* Dark mode as default (Lex Intelligentia identity) */
+  --primary: oklch(0.75 0.18 55);          /* vivid orange */
+  --primary-foreground: oklch(0.12 0.01 55);
+  --sidebar-primary: oklch(0.72 0.19 50);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --background: oklch(0.1 0.005 260);       /* near-black */
+  --foreground: oklch(0.92 0.005 80);       /* warm off-white */
+  --card: oklch(0.15 0.008 260);
+  --card-foreground: oklch(0.92 0.005 80);
+  --popover: oklch(0.15 0.008 260);
+  --popover-foreground: oklch(0.92 0.005 80);
+  --secondary: oklch(0.2 0.01 260);
+  --secondary-foreground: oklch(0.82 0.005 80);
+  --muted: oklch(0.22 0.008 260);
+  --muted-foreground: oklch(0.6 0.015 260);
+  --accent: oklch(0.22 0.008 260);
+  --accent-foreground: oklch(0.92 0.005 80);
+  --destructive: oklch(0.65 0.25 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.75 0.18 55);
+  --chart-1: oklch(0.78 0.17 55);
+  --chart-2: oklch(0.68 0.2 40);
+  --chart-3: oklch(0.6 0.15 30);
+  --chart-4: oklch(0.55 0.12 280);
+  --chart-5: oklch(0.5 0.1 200);
+  --sidebar: oklch(0.12 0.006 260);
+  --sidebar-foreground: oklch(0.88 0.005 80);
+  --sidebar-accent: oklch(0.2 0.01 260);
+  --sidebar-accent-foreground: oklch(0.98 0 0);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.75 0.18 55);
 }
 
 .dark {
-  --primary: var(--color-blue-700);
-  --primary-foreground: var(--color-blue-50);
-  --sidebar-primary: var(--color-blue-500);
-  --sidebar-primary-foreground: var(--color-blue-50);
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.85 0.005 65);
-  --card: oklch(0.21 0.006 285.885);
-  --card-foreground: oklch(0.85 0.005 65);
-  --popover: oklch(0.21 0.006 285.885);
-  --popover-foreground: oklch(0.85 0.005 65);
-  --secondary: oklch(0.24 0.006 286.033);
-  --secondary-foreground: oklch(0.7 0.005 65);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
-  --accent-foreground:  oklch(0.92 0.005 65);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
+  /* Same as root — dark-first */
+  --primary: oklch(0.75 0.18 55);
+  --primary-foreground: oklch(0.12 0.01 55);
+  --sidebar-primary: oklch(0.72 0.19 50);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --background: oklch(0.1 0.005 260);
+  --foreground: oklch(0.92 0.005 80);
+  --card: oklch(0.15 0.008 260);
+  --card-foreground: oklch(0.92 0.005 80);
+  --popover: oklch(0.15 0.008 260);
+  --popover-foreground: oklch(0.92 0.005 80);
+  --secondary: oklch(0.2 0.01 260);
+  --secondary-foreground: oklch(0.82 0.005 80);
+  --muted: oklch(0.22 0.008 260);
+  --muted-foreground: oklch(0.6 0.015 260);
+  --accent: oklch(0.22 0.008 260);
+  --accent-foreground: oklch(0.92 0.005 80);
+  --destructive: oklch(0.65 0.25 25);
+  --destructive-foreground: oklch(0.98 0 0);
   --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.488 0.243 264.376);
-  --chart-1: var(--color-blue-300);
-  --chart-2: var(--color-blue-500);
-  --chart-3: var(--color-blue-600);
-  --chart-4: var(--color-blue-700);
-  --chart-5: var(--color-blue-800);
-  --sidebar: oklch(0.21 0.006 285.885);
-  --sidebar-foreground: oklch(0.85 0.005 65);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
-  --sidebar-accent-foreground:  oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.488 0.243 264.376);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.75 0.18 55);
+  --chart-1: oklch(0.78 0.17 55);
+  --chart-2: oklch(0.68 0.2 40);
+  --chart-3: oklch(0.6 0.15 30);
+  --chart-4: oklch(0.55 0.12 280);
+  --chart-5: oklch(0.5 0.1 200);
+  --sidebar: oklch(0.12 0.006 260);
+  --sidebar-foreground: oklch(0.88 0.005 80);
+  --sidebar-accent: oklch(0.2 0.01 260);
+  --sidebar-accent-foreground: oklch(0.98 0 0);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.75 0.18 55);
 }
 
 @layer base {
@@ -134,24 +137,11 @@
 }
 
 @layer components {
-  /**
-   * Custom container utility that centers content and adds responsive padding.
-   *
-   * This overrides Tailwind's default container behavior to:
-   * - Auto-center content (mx-auto)
-   * - Add responsive horizontal padding
-   * - Set max-width for large screens
-   *
-   * Usage: <div className="container">...</div>
-   *
-   * For custom widths, use max-w-* utilities directly:
-   * <div className="max-w-6xl mx-auto px-4">...</div>
-   */
   .container {
     width: 100%;
     margin-left: auto;
     margin-right: auto;
-    padding-left: 1rem; /* 16px - mobile padding */
+    padding-left: 1rem;
     padding-right: 1rem;
   }
 
@@ -162,16 +152,34 @@
 
   @media (min-width: 640px) {
     .container {
-      padding-left: 1.5rem; /* 24px - tablet padding */
+      padding-left: 1.5rem;
       padding-right: 1.5rem;
     }
   }
 
   @media (min-width: 1024px) {
     .container {
-      padding-left: 2rem; /* 32px - desktop padding */
+      padding-left: 2rem;
       padding-right: 2rem;
-      max-width: 1280px; /* Standard content width */
+      max-width: 1400px;
     }
+  }
+}
+
+/* Lex Intelligentia gradient utilities */
+@layer utilities {
+  .gradient-orange {
+    background: linear-gradient(135deg, oklch(0.78 0.17 55), oklch(0.65 0.22 35));
+  }
+  .text-gradient-orange {
+    background: linear-gradient(135deg, oklch(0.78 0.17 55), oklch(0.65 0.22 35));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .glass-card {
+    background: oklch(0.15 0.008 260 / 60%);
+    backdrop-filter: blur(12px);
+    border: 1px solid oklch(1 0 0 / 8%);
   }
 }
