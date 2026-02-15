@@ -4,6 +4,7 @@
  * and LLM-based community summarization for GraphRAG.
  */
 import { invokeLLM } from "./_core/llm";
+import { logger } from "./_core/logger";
 import {
   getAllGraphNodes, getAllGraphEdges, updateGraphNodeCommunity,
   upsertCommunity, clearCommunities, createLog, updateLog,
@@ -226,7 +227,7 @@ Gere:
     }
     return JSON.parse(content);
   } catch (error: any) {
-    console.error(`[GraphEngine] Failed to summarize community ${community.id}:`, error.message);
+    logger.error({ err: String(error), communityId: community.id }, `[GraphEngine] Failed to summarize community ${community.id}`);
     return {
       title: `Comunidade ${community.id}`,
       summary: `Comunidade com ${community.members.length} entidades e ${community.edges.length} relações`,

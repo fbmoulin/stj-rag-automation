@@ -4,6 +4,7 @@
  */
 import axios from "axios";
 import { upsertDataset, upsertResource, getDatasetBySlug, updateResourceStatus, createLog, updateLog } from "./db";
+import { logger } from "./_core/logger";
 
 const STJ_BASE = "https://dadosabertos.web.stj.jus.br";
 const CKAN_API = `${STJ_BASE}/api/3/action`;
@@ -77,7 +78,7 @@ export async function fetchDatasetInfo(slug: string): Promise<any> {
     const response = await client.get(`${CKAN_API}/package_show`, { params: { id: slug } });
     return response.data?.result;
   } catch (error: any) {
-    console.error(`[STJ Extractor] Failed to fetch dataset ${slug}:`, error.message);
+    logger.error({ err: String(error), slug }, `[STJ Extractor] Failed to fetch dataset ${slug}`);
     // If CKAN API is blocked, return static info
     return null;
   }
