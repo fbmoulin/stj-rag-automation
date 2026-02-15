@@ -14,6 +14,7 @@
     "qdrant:import": "tsx scripts/qdrant_import.ts",
     "qdrant:test-ingest": "tsx scripts/qdrant_test_ingest.ts"
     , "gemini:list-models": "tsx scripts/gemini_list_models.ts"
+    , "embeddings:supabase": "tsx scripts/supabase_embed_and_upsert.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",
