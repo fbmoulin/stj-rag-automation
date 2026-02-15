@@ -19,7 +19,7 @@ Quick start (desenvolvimento)
 
    pnpm dev
 
-3. Testes:
+3. Testes (58 passing, 10 suites):
 
    pnpm test
 
@@ -61,6 +61,23 @@ Async batch embeddings
 
 - Para batch assíncrono (recomendado para grandes volumes) usamos a API asyncBatchEmbedContent com GCS.
 - Veja `scripts/gemini_gcs_batch.ts` e `scripts/setup_gcp_bucket.ts` — ambos requerem credenciais GCP.
+
+Testes
+
+O projeto possui 58 testes unitários passando em 10 suites:
+
+| Suite | Testes | Tipo |
+|-------|:------:|------|
+| chunker.test.ts | 15 | Pure functions |
+| entity-extractor.test.ts | 9 | Mock LLM |
+| graph-engine.test.ts | 9 | Pure + Mock DB |
+| graphrag-query.test.ts | 6 | Mock all |
+| document-processor.test.ts | 6 | Mock DB + embeddings |
+| stj-extractor.test.ts | 5 | Static data |
+| vector/qdrant.test.ts | 3 | Mock fetch |
+| storage.test.ts | 3 | Mock fetch + ENV |
+| auth.logout.test.ts | 1 | Existing |
+| embeddings.test.ts | 1 | Needs GEMINI_API_KEY |
 
 Deploy
 
