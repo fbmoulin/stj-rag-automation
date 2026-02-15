@@ -1,4 +1,5 @@
 # STJ RAG Automation
+
 Projeto para ingestão, extração e consulta semântica de dados jurídicos do STJ (GraphRAG + RAG).
 
 Principais componentes

@@ -2,7 +2,7 @@
 
 Fase 0 — Preparação (done in repo)
 
-- Atualizar docs e scripts (README, DEPLOY_PLAN, scripts/*) — done
+- Atualizar docs e scripts (README, DEPLOY_PLAN, scripts/\*) — done
 
 Fase 1 — Infra básica (1-2 days)
 
@@ -31,4 +31,3 @@ Fase 5 — Production rollout
 - Canary release, monitor smoke tests, rollback plan
 
 Notas: tempos estimados dependem de acesso às credenciais e infra.
-

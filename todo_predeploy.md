@@ -11,4 +11,3 @@
 - [ ] 9. Final: Smoke queries (ingest + query) validated
 
 Run `pnpm tsx scripts/auto_mark_predeploy.ts` to validate and mark items automatically.
-

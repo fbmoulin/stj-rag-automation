@@ -22,7 +22,7 @@ Resumo objetivo das recomendações para este projeto:
   - Validar recall/quality após migração de vetor store.
 
 Referências rápidas:
+
 - Qdrant: <https://qdrant.tech/documentation/>
 - Google Generative AI: <https://cloud.google.com/generative-ai>
 - GCS buckets: <https://cloud.google.com/storage/docs/creating-buckets>
-
