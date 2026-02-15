@@ -1,0 +1,45 @@
+version: "3.8"
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: stj_rag_db
+      MYSQL_USER: stj
+      MYSQL_PASSWORD: stjpassword
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+
+  app:
+    build: .
+    depends_on:
+      - db
+      - qdrant
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DATABASE_URL=mysql://stj:stjpassword@db:3306/stj_rag_db
+      - JWT_SECRET=change_me
+      - GEMINI_API_KEY=changeme
+      - QDRANT_URL=http://qdrant:6333
+    volumes:
+      - ./:/usr/src/app
+      - chroma_data:/data/chroma
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    restart: unless-stopped
+    ports:
+      - "6333:6333" # HTTP API
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+volumes:
+  db_data:
+  chroma_data:
+  qdrant_data:
+

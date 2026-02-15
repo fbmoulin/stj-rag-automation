@@ -7,6 +7,8 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { logger } from "./logger";
+import { getMetricsSnapshot } from "./metrics";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -50,16 +52,49 @@ async function startServer() {
     serveStatic(app);
   }
 
+  // Metrics endpoint (Prometheus text format)
+  app.get("/metrics", (_req, res) => {
+    res.setHeader("Content-Type", "text/plain; version=0.0.4");
+    res.status(200).send(formatPrometheusMetrics());
+  });
+
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);
 
   if (port !== preferredPort) {
-    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
+    logger.warn(`Port ${preferredPort} is busy, using port ${port} instead`);
   }
 
   server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
+    logger.info(`Server running on http://localhost:${port}/`);
   });
 }
 
-startServer().catch(console.error);
+// Expose a simple /metrics Prometheus-format endpoint
+function formatPrometheusMetrics() {
+  const snap = getMetricsSnapshot();
+  const lines: string[] = [];
+
+  // Counters
+  for (const [k, v] of Object.entries(snap.counters || {})) {
+    const name = k.replace(/[^a-zA-Z0-9_]/g, "_");
+    lines.push(`# TYPE ${name} counter`);
+    lines.push(`${name} ${v}`);
+  }
+
+  // Timings: expose count, total_ms, avg_ms
+  for (const [k, v] of Object.entries(snap.timings || {})) {
+    const base = k.replace(/[^a-zA-Z0-9_]/g, "_");
+    lines.push(`# TYPE ${base}_count gauge`);
+    lines.push(`${base}_count ${v.count}`);
+    lines.push(`# TYPE ${base}_total_ms gauge`);
+    lines.push(`${base}_total_ms ${v.totalMs}`);
+    const avg = v.count > 0 ? v.totalMs / v.count : 0;
+    lines.push(`# TYPE ${base}_avg_ms gauge`);
+    lines.push(`${base}_avg_ms ${avg}`);
+  }
+
+  return lines.join("\n") + "\n";
+}
+
+startServer().catch((err) => logger.error({ err: String(err) }, "startServer failed"));

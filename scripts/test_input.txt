@@ -1,0 +1,2 @@
+Texto de teste 1 para embeddings.
+Texto de teste 2 para embeddings.

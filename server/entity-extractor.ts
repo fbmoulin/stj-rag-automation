@@ -4,6 +4,7 @@
  */
 import { invokeLLM } from "./_core/llm";
 import type { TextChunk } from "./chunker";
+import { logger } from "./_core/logger";
 
 export interface ExtractedEntity {
   entityId: string;
@@ -150,7 +151,7 @@ export async function extractEntitiesFromChunk(chunk: TextChunk): Promise<Extrac
 
     return { entities, relationships };
   } catch (error: any) {
-    console.error("[EntityExtractor] Extraction failed:", error.message);
+    logger.error({ err: String(error) }, "[EntityExtractor] Extraction failed:");
     return { entities: [], relationships: [] };
   }
 }
