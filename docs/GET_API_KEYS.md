@@ -12,6 +12,17 @@ Este guia reúne links e passos rápidos para obter as chaves/credenciais usadas
  - Service Account e chave JSON: https://cloud.google.com/iam/docs/creating-managing-service-account-keys
  - Papéis recomendados para o SA: `roles/storage.admin` (ou `roles/storage.objectAdmin`) e `roles/iam.serviceAccountUser` quando necessário.
  - Autenticação local: defina `GOOGLE_APPLICATION_CREDENTIALS` apontando para o JSON do SA.
+ - Comandos úteis (gcloud):
+   - criar bucket:
+     `gcloud storage buckets create gs://<BUCKET> --project=<PROJECT> --location=<LOCATION>`
+   - criar SA:
+     `gcloud iam service-accounts create stj-embeddings-sa --display-name="STJ embeddings service account" --project=<PROJECT>`
+   - atribuir papel:
+     `gcloud projects add-iam-policy-binding <PROJECT> --member="serviceAccount:stj-embeddings-sa@<PROJECT>.iam.gserviceaccount.com" --role="roles/storage.admin"`
+   - criar chave (gera JSON):
+     `gcloud iam service-accounts keys create ./stj-embeddings-sa-key.json --iam-account=stj-embeddings-sa@<PROJECT>.iam.gserviceaccount.com`
+   - ver credenciais ativas:
+     `gcloud auth list` / `gcloud auth application-default login`
 
 3) Qdrant (self-hosted)
  - Documentação: https://qdrant.tech/documentation/
