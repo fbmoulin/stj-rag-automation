@@ -10,7 +10,10 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
-    "db:push": "drizzle-kit generate && drizzle-kit migrate"
+    "db:push": "drizzle-kit generate && drizzle-kit migrate",
+    "qdrant:import": "tsx scripts/qdrant_import.ts",
+    "qdrant:test-ingest": "tsx scripts/qdrant_test_ingest.ts"
+    , "gemini:list-models": "tsx scripts/gemini_list_models.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",

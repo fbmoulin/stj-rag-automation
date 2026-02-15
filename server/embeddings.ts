@@ -12,10 +12,13 @@ import { isQdrantConfigured, ensureCollection as ensureQdrantCollection, upsertP
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_EMBED_URL =
   process.env.GEMINI_EMBED_URL ||
-  "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent";
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent";
 const GEMINI_BATCH_EMBED_URL =
   process.env.GEMINI_BATCH_EMBED_URL ||
-  "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:batchEmbedContents";
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:asyncBatchEmbedContent";
+const GEMINI_LIST_MODELS_URL =
+  process.env.GEMINI_LIST_MODELS_URL ||
+  "https://generativelanguage.googleapis.com/v1beta/models";
 
 const EMBEDDING_DIMENSION = Number(process.env.EMBEDDING_DIMENSION || "768");
 const BATCH_SIZE = Number(process.env.EMBEDDING_BATCH_SIZE || "50"); // Gemini batch limit
@@ -25,6 +28,7 @@ const EMBEDDING_CONCURRENCY = Number(process.env.EMBEDDING_CONCURRENCY || "1");
 
 let chromaClient: ChromaClient | null = null;
 import pLimit from "p-limit";
+import { randomUUID } from "crypto";
 
 export async function fetchWithRetry(input: RequestInfo, init?: RequestInit): Promise<Response> {
   let lastError: any = null;
@@ -91,7 +95,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
   const payload = {
-    model: "models/text-embedding-004",
+    model: "models/gemini-embedding-001",
     content: { parts: [{ text }] },
     taskType: "RETRIEVAL_DOCUMENT",
   };
@@ -113,24 +117,184 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 export async function generateBatchEmbeddings(texts: string[]): Promise<number[][]> {
   if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
   if (texts.length === 0) return [];
+  // Attempt async batch embed via Gemini's asyncBatchEmbedContent endpoint.
+  // Metrics / tuning
+  incMetric("embedding_batch_jobs_started");
+  const pollIntervalMs = Number(process.env.EMBEDDING_ASYNC_POLL_INTERVAL_MS || "1000");
+  const maxMs = Number(process.env.EMBEDDING_ASYNC_TIMEOUT_MS || "60000");
 
-  const requests = texts.map((text) => ({
-    model: "models/text-embedding-004",
-    content: { parts: [{ text }] },
-    taskType: "RETRIEVAL_DOCUMENT",
-  }));
+  // Try multiple async batch payload shapes. Some Gemini Batch APIs accept NDJSON (JSONL) lines
+  // of {"key": "...", "request": {...}} while others accept a JSON { requests: [...] } body.
+  // We'll try in order: JSON body, NDJSON lines.
+  const tryAsyncBatch = async (): Promise<number[][] | null> => {
+    // 1) Try JSON array payload (requests)
+    try {
+      const requests = texts.map((text) => ({
+        input: { text },
+      }));
+      const startMs = Date.now();
+      const res = await fetchWithRetry(GEMINI_BATCH_EMBED_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": GEMINI_API_KEY,
+        },
+        body: JSON.stringify({ requests, model: "models/gemini-embedding-001" }),
+      });
+      recordTiming("embedding_batch_request_ms", Date.now() - startMs);
+      if (!res) throw new Error("no response from batch endpoint");
+      // If immediate response contains embeddings, return them
+      if (res.ok) {
+        const body = await res.json().catch(() => null);
+        // If operation-style response with name
+        if (body && body.done && body.response) {
+          const embeddings = extractEmbeddingsFromOperationResponse(body.response);
+          if (embeddings) {
+            incMetric("embedding_batch_jobs_succeeded");
+            return embeddings;
+          }
+        }
+        const opName = body?.name || body?.operation?.name || body?.operationName || body?.operation?.operationId;
+        if (opName) {
+          // Poll operations endpoint
+          const base = GEMINI_BATCH_EMBED_URL.replace(/\/models\/.*$/, "");
+          const opUrl = `${base}/operations/${encodeURIComponent(opName)}`;
+          const start = Date.now();
+          let attempt = 0;
+          while (Date.now() - start < maxMs) {
+            await new Promise((r) => setTimeout(r, Math.min(pollIntervalMs * Math.pow(2, attempt), 5000)));
+            attempt++;
+            const pollRes = await fetchWithRetry(opUrl, {
+              method: "GET",
+              headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
+            });
+            if (!pollRes.ok) continue;
+            const pollBody = await pollRes.json().catch(() => null);
+            if (pollBody?.done && pollBody?.response) {
+              const embeddings = extractEmbeddingsFromOperationResponse(pollBody.response);
+              if (embeddings) {
+                incMetric("embedding_batch_jobs_succeeded");
+                recordTiming("embedding_batch_job_poll_ms", Date.now() - start);
+                return embeddings;
+              }
+              break;
+            }
+          }
+          incMetric("embedding_batch_jobs_timedout");
+          return null;
+        }
+        // Inline embeddings returned?
+        const inline = await res.json().catch(() => null);
+        const extracted = extractEmbeddingsFromOperationResponse(inline);
+        if (extracted) {
+          incMetric("embedding_batch_jobs_succeeded");
+          return extracted;
+        }
+      } else {
+        const txt = await res.text().catch(() => "");
+        logger.warn({ status: res.status, body: txt }, "async batch json payload returned non-ok");
+      }
+    } catch (err: any) {
+      logger.warn({ err: String(err) }, "async batch json payload failed");
+    }
 
-  const res = await fetchWithRetry(GEMINI_BATCH_EMBED_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": GEMINI_API_KEY,
-    },
-    body: JSON.stringify({ requests }),
-  });
+    // 2) Try NDJSON / JSONL payload shape commonly used by batch endpoints
+    try {
+      const lines = texts.map((text, idx) =>
+        JSON.stringify({
+          key: `r${idx}`,
+          request: {
+            content: { parts: [{ text }] },
+            // optional parameters can be added per-request
+          },
+        })
+      );
+      const ndjson = lines.join("\n");
+      const startMs = Date.now();
+      const res = await fetchWithRetry(GEMINI_BATCH_EMBED_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-ndjson",
+          "x-goog-api-key": GEMINI_API_KEY,
+        },
+        body: ndjson,
+      });
+      recordTiming("embedding_batch_request_ms", Date.now() - startMs);
+      if (!res) throw new Error("no response from batch endpoint (ndjson)");
+      if (res.ok) {
+        const body = await res.json().catch(() => null);
+        const opName = body?.name || body?.operation?.name;
+        if (body && Array.isArray(body.responses) && body.responses.length) {
+          // some implementations return responses inline as array
+          const embeddings = body.responses.map((r: any) => r.embedding?.values || []);
+          incMetric("embedding_batch_jobs_succeeded");
+          return embeddings;
+        }
+        if (opName) {
+          const base = GEMINI_BATCH_EMBED_URL.replace(/\/models\/.*$/, "");
+          const opUrl = `${base}/operations/${encodeURIComponent(opName)}`;
+          const start = Date.now();
+          let attempt = 0;
+          while (Date.now() - start < maxMs) {
+            await new Promise((r) => setTimeout(r, Math.min(pollIntervalMs * Math.pow(2, attempt), 5000)));
+            attempt++;
+            const pollRes = await fetchWithRetry(opUrl, {
+              method: "GET",
+              headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
+            });
+            if (!pollRes.ok) continue;
+            const pollBody = await pollRes.json().catch(() => null);
+            if (pollBody?.done && pollBody?.response) {
+              const embeddings = extractEmbeddingsFromOperationResponse(pollBody.response);
+              if (embeddings) {
+                incMetric("embedding_batch_jobs_succeeded");
+                recordTiming("embedding_batch_job_poll_ms", Date.now() - start);
+                return embeddings;
+              }
+              break;
+            }
+          }
+          incMetric("embedding_batch_jobs_timedout");
+          return null;
+        }
+      } else {
+        const txt = await res.text().catch(() => "");
+        logger.warn({ status: res.status, body: txt }, "async batch ndjson payload returned non-ok");
+      }
+    } catch (err: any) {
+      logger.warn({ err: String(err) }, "async batch ndjson payload failed");
+    }
 
-  const data = await res.json();
-  return (data.embeddings || []).map((e: any) => e.values || []);
+    return null;
+  };
+
+  const startAll = Date.now();
+  const asyncResult = await tryAsyncBatch();
+  recordTiming("embedding_batch_total_attempt_ms", Date.now() - startAll);
+  if (asyncResult && asyncResult.length === texts.length) {
+    return asyncResult;
+  }
+  // Async batch did not return a complete result — in async-only mode we abort here.
+  incMetric("embedding_batch_jobs_failed_async");
+  logger.error("asyncBatchEmbedContent did not produce a complete result; aborting batch (async-only)");
+  throw new Error("asyncBatchEmbedContent failed or timed out; batch embedding aborted (async-only)");
+}
+
+function extractEmbeddingsFromOperationResponse(resp: any): number[][] | null {
+  // Try multiple common shapes
+  // 1) resp.result?.embeddings
+  if (resp?.result?.embeddings && Array.isArray(resp.result.embeddings)) {
+    return resp.result.embeddings.map((e: any) => e.values || []);
+  }
+  // 2) resp.embeddings
+  if (resp?.embeddings && Array.isArray(resp.embeddings)) {
+    return resp.embeddings.map((e: any) => e.values || []);
+  }
+  // 3) resp.output?.embeddings
+  if (resp?.output?.embeddings && Array.isArray(resp.output.embeddings)) {
+    return resp.output.embeddings.map((e: any) => e.values || []);
+  }
+  return null;
 }
 
 /** Store chunks with embeddings in ChromaDB */
@@ -163,7 +327,7 @@ export async function storeChunksInChroma(
         try {
           const embeddings = await generateBatchEmbeddings(texts);
           const points = batch.map((c, idx) => ({
-            id: `${collectionName}_${batchIndex + idx}_${Date.now()}`,
+            id: randomUUID(),
             vector: embeddings[idx],
             payload: { text: texts[idx], ...c.metadata },
           }));
@@ -267,7 +431,7 @@ export async function queryChroma(
 
   // Generate query embedding
   const payload = {
-    model: "models/text-embedding-004",
+    model: "models/gemini-embedding-001",
     content: { parts: [{ text: queryText }] },
     taskType: "RETRIEVAL_QUERY",
   };
@@ -282,7 +446,6 @@ export async function queryChroma(
   });
 
   const data = await response.json();
-  const queryEmbedding = data.embedding?.values || [];
   const queryEmbedding = data.embedding?.values || [];
 
   // If Qdrant is configured, use it for nearest-neighbor search

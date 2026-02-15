@@ -4,9 +4,15 @@
  */
 import { logger } from "../_core/logger";
 
-const QDRANT_URL = process.env.QDRANT_URL || "";
-const QDRANT_API_KEY = process.env.QDRANT_API_KEY || "";
 const DEFAULT_TIMEOUT_MS = 10_000;
+
+function getQdrantUrl() {
+  return process.env.QDRANT_URL || "";
+}
+
+function getQdrantApiKey() {
+  return process.env.QDRANT_API_KEY || "";
+}
 
 async function fetchWithRetry(input: RequestInfo, init?: RequestInit, maxRetries = 3): Promise<Response> {
   let lastErr: any = null;
@@ -27,14 +33,15 @@ async function fetchWithRetry(input: RequestInfo, init?: RequestInit, maxRetries
 }
 
 function makeUrl(path: string) {
-  if (!QDRANT_URL) throw new Error("QDRANT_URL is not configured");
-  return `${QDRANT_URL.replace(/\/$/, "")}${path}`;
+  const base = getQdrantUrl();
+  if (!base) throw new Error("QDRANT_URL is not configured");
+  return `${base.replace(/\/$/, "")}${path}`;
 }
 
 export async function ensureCollection(collectionName: string, dimension: number) {
   try {
     const url = makeUrl(`/collections/${encodeURIComponent(collectionName)}`);
-    const res = await fetchWithRetry(url, { method: "GET", headers: { "Content-Type": "application/json", ...(QDRANT_API_KEY ? { "api-key": QDRANT_API_KEY } : {}) } }, 1);
+    const res = await fetchWithRetry(url, { method: "GET", headers: { "Content-Type": "application/json", ...(getQdrantApiKey() ? { "api-key": getQdrantApiKey() } : {}) } }, 1);
     if (res.ok) return;
   } catch {
     // proceed to create
@@ -49,7 +56,7 @@ export async function ensureCollection(collectionName: string, dimension: number
   const createUrl = makeUrl(`/collections/${encodeURIComponent(collectionName)}`);
   await fetchWithRetry(createUrl, {
     method: "PUT",
-    headers: { "Content-Type": "application/json", ...(QDRANT_API_KEY ? { "api-key": QDRANT_API_KEY } : {}) },
+    headers: { "Content-Type": "application/json", ...(getQdrantApiKey() ? { "api-key": getQdrantApiKey() } : {}) },
     body: JSON.stringify(body),
   });
   logger.info({ collectionName, dimension }, "qdrant: collection created");
@@ -62,12 +69,11 @@ export type QdrantPoint = {
 };
 
 export async function upsertPoints(collectionName: string, points: QdrantPoint[]) {
-  if (!QDRANT_URL) throw new Error("QDRANT_URL is not configured");
   const url = makeUrl(`/collections/${encodeURIComponent(collectionName)}/points`);
   const body = { points };
   const res = await fetchWithRetry(url, {
     method: "PUT",
-    headers: { "Content-Type": "application/json", ...(QDRANT_API_KEY ? { "api-key": QDRANT_API_KEY } : {}) },
+    headers: { "Content-Type": "application/json", ...(getQdrantApiKey() ? { "api-key": getQdrantApiKey() } : {}) },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -78,7 +84,6 @@ export async function upsertPoints(collectionName: string, points: QdrantPoint[]
 }
 
 export async function searchCollection(collectionName: string, vector: number[], limit = 10, withPayload = true) {
-  if (!QDRANT_URL) throw new Error("QDRANT_URL is not configured");
   const url = makeUrl(`/collections/${encodeURIComponent(collectionName)}/points/search`);
   const body: any = {
     vector,
@@ -87,7 +92,7 @@ export async function searchCollection(collectionName: string, vector: number[],
   };
   const res = await fetchWithRetry(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...(QDRANT_API_KEY ? { "api-key": QDRANT_API_KEY } : {}) },
+    headers: { "Content-Type": "application/json", ...(getQdrantApiKey() ? { "api-key": getQdrantApiKey() } : {}) },
     body: JSON.stringify(body),
   });
   const data = await res.json();
@@ -101,6 +106,6 @@ export async function searchCollection(collectionName: string, vector: number[],
 }
 
 export function isQdrantConfigured() {
-  return Boolean(QDRANT_URL);
+  return Boolean(getQdrantUrl());
 }
 
