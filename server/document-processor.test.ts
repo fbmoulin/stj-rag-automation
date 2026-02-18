@@ -1,7 +1,7 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
 
 vi.mock("./embeddings", () => ({
-  storeChunksInChroma: vi.fn().mockResolvedValue({ stored: 5 }),
+  storeChunks: vi.fn().mockResolvedValue({ stored: 5 }),
 }));
 vi.mock("./db", () => ({
   updateDocument: vi.fn(),
@@ -14,10 +14,10 @@ vi.mock("./_core/logger", () => ({
 
 import { extractText, processDocument } from "./document-processor";
 import { updateDocument } from "./db";
-import { storeChunksInChroma } from "./embeddings";
+import { storeChunks } from "./embeddings";
 
 const mockUpdateDoc = vi.mocked(updateDocument);
-const mockStoreChunks = vi.mocked(storeChunksInChroma);
+const mockStoreChunks = vi.mocked(storeChunks);
 
 beforeEach(() => {
   vi.clearAllMocks();

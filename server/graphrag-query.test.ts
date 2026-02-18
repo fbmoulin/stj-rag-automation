@@ -2,7 +2,7 @@ import { vi, describe, it, expect, beforeEach } from "vitest";
 
 vi.mock("./_core/llm", () => ({ invokeLLM: vi.fn() }));
 vi.mock("./embeddings", () => ({
-  queryChroma: vi.fn(),
+  queryCollection: vi.fn(),
   queryMultipleCollections: vi.fn(),
   listCollections: vi.fn(),
 }));

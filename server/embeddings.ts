@@ -1,13 +1,12 @@
 /**
- * Embeddings Service - Generates embeddings via Gemini API and stores in ChromaDB
+ * Embeddings Service - Generates embeddings via Gemini API and stores in Qdrant
  */
-import { ChromaClient, Collection } from "chromadb";
 import type { TextChunk } from "./chunker";
-import fs from "fs";
-import path from "path";
 import { logger } from "./_core/logger";
 import { incMetric, recordTiming } from "./_core/metrics";
-import { isQdrantConfigured, ensureCollection as ensureQdrantCollection, upsertPoints as qdrantUpsertPoints, searchCollection as qdrantSearchCollection } from "./vector/qdrant";
+import { ensureCollection as ensureQdrantCollection, upsertPoints as qdrantUpsertPoints, searchCollection as qdrantSearchCollection } from "./vector/qdrant";
+import pLimit from "p-limit";
+import { randomUUID } from "crypto";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_EMBED_URL =
@@ -16,9 +15,6 @@ const GEMINI_EMBED_URL =
 const GEMINI_BATCH_EMBED_URL =
   process.env.GEMINI_BATCH_EMBED_URL ||
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:asyncBatchEmbedContent";
-const GEMINI_LIST_MODELS_URL =
-  process.env.GEMINI_LIST_MODELS_URL ||
-  "https://generativelanguage.googleapis.com/v1beta/models";
 
 const EMBEDDING_DIMENSION = Number(process.env.EMBEDDING_DIMENSION || "768");
 const BATCH_SIZE = Number(process.env.EMBEDDING_BATCH_SIZE || "50"); // Gemini batch limit
@@ -26,15 +22,10 @@ const MAX_RETRIES = Number(process.env.EMBEDDING_MAX_RETRIES || "3");
 const RETRY_BACKOFF_BASE_MS = Number(process.env.EMBEDDING_RETRY_BASE_MS || "300");
 const EMBEDDING_CONCURRENCY = Number(process.env.EMBEDDING_CONCURRENCY || "1");
 
-let chromaClient: ChromaClient | null = null;
-import pLimit from "p-limit";
-import { randomUUID } from "crypto";
-
 export async function fetchWithRetry(input: RequestInfo, init?: RequestInit): Promise<Response> {
   let lastError: any = null;
   for (let attempt = 0; attempt < Math.max(1, MAX_RETRIES); attempt++) {
     try {
-      const start = Date.now();
       const res = await fetch(input, init);
       if (res.ok) return res;
       const text = await res.text().catch(() => "");
@@ -49,45 +40,6 @@ export async function fetchWithRetry(input: RequestInfo, init?: RequestInit): Pr
     await new Promise((r) => setTimeout(r, backoff));
   }
   throw lastError || new Error("fetchWithRetry failed");
-}
-
-/** Get or create ChromaDB client */
-export function getChromaClient(): ChromaClient {
-  if (!chromaClient) {
-    // Use configured CHROMA_PATH or default to /data/chroma (suitable for docker-compose mount)
-    const chromaPath = process.env.CHROMA_PATH || path.resolve(process.cwd(), "data", "chroma");
-    try {
-      fs.mkdirSync(chromaPath, { recursive: true });
-    } catch (err: any) {
-      logger.error({ err: String(err), chromaPath }, "Failed to create CHROMA_PATH directory, falling back to in-memory");
-      chromaClient = new ChromaClient({ path: undefined });
-      return chromaClient;
-    }
-    // Try to initialize a file-backed Chroma using duckdb+parquet backend when available.
-    try {
-      chromaClient = new ChromaClient({
-        path: chromaPath,
-        settings: {
-          chroma_db_impl: "duckdb+parquet",
-          persist_directory: chromaPath,
-        },
-      } as any);
-    } catch {
-      // Fallback: try simple path option
-      chromaClient = new ChromaClient({ path: chromaPath } as any);
-    }
-    logger.info({ chromaPath }, "Chroma client initialized with persistent path");
-  }
-  return chromaClient;
-}
-
-/** Get or create a ChromaDB collection */
-export async function getOrCreateCollection(name: string): Promise<Collection> {
-  const client = getChromaClient();
-  return client.getOrCreateCollection({
-    name,
-    metadata: { "hnsw:space": "cosine" },
-  });
 }
 
 /** Generate embedding for a single text using Gemini API */
@@ -117,15 +69,10 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 export async function generateBatchEmbeddings(texts: string[]): Promise<number[][]> {
   if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
   if (texts.length === 0) return [];
-  // Attempt async batch embed via Gemini's asyncBatchEmbedContent endpoint.
-  // Metrics / tuning
   incMetric("embedding_batch_jobs_started");
   const pollIntervalMs = Number(process.env.EMBEDDING_ASYNC_POLL_INTERVAL_MS || "1000");
   const maxMs = Number(process.env.EMBEDDING_ASYNC_TIMEOUT_MS || "60000");
 
-  // Try multiple async batch payload shapes. Some Gemini Batch APIs accept NDJSON (JSONL) lines
-  // of {"key": "...", "request": {...}} while others accept a JSON { requests: [...] } body.
-  // We'll try in order: JSON body, NDJSON lines.
   const tryAsyncBatch = async (): Promise<number[][] | null> => {
     // 1) Try JSON array payload (requests)
     try {
@@ -143,10 +90,8 @@ export async function generateBatchEmbeddings(texts: string[]): Promise<number[]
       });
       recordTiming("embedding_batch_request_ms", Date.now() - startMs);
       if (!res) throw new Error("no response from batch endpoint");
-      // If immediate response contains embeddings, return them
       if (res.ok) {
         const body = await res.json().catch(() => null);
-        // If operation-style response with name
         if (body && body.done && body.response) {
           const embeddings = extractEmbeddingsFromOperationResponse(body.response);
           if (embeddings) {
@@ -156,7 +101,6 @@ export async function generateBatchEmbeddings(texts: string[]): Promise<number[]
         }
         const opName = body?.name || body?.operation?.name || body?.operationName || body?.operation?.operationId;
         if (opName) {
-          // Poll operations endpoint
           const base = GEMINI_BATCH_EMBED_URL.replace(/\/models\/.*$/, "");
           const opUrl = `${base}/operations/${encodeURIComponent(opName)}`;
           const start = Date.now();
@@ -183,7 +127,6 @@ export async function generateBatchEmbeddings(texts: string[]): Promise<number[]
           incMetric("embedding_batch_jobs_timedout");
           return null;
         }
-        // Inline embeddings returned?
         const extracted = extractEmbeddingsFromOperationResponse(body);
         if (extracted) {
           incMetric("embedding_batch_jobs_succeeded");
@@ -197,14 +140,13 @@ export async function generateBatchEmbeddings(texts: string[]): Promise<number[]
       logger.warn({ err: String(err) }, "async batch json payload failed");
     }
 
-    // 2) Try NDJSON / JSONL payload shape commonly used by batch endpoints
+    // 2) Try NDJSON / JSONL payload shape
     try {
       const lines = texts.map((text, idx) =>
         JSON.stringify({
           key: `r${idx}`,
           request: {
             content: { parts: [{ text }] },
-            // optional parameters can be added per-request
           },
         })
       );
@@ -224,7 +166,6 @@ export async function generateBatchEmbeddings(texts: string[]): Promise<number[]
         const body = await res.json().catch(() => null);
         const opName = body?.name || body?.operation?.name;
         if (body && Array.isArray(body.responses) && body.responses.length) {
-          // some implementations return responses inline as array
           const embeddings = body.responses.map((r: any) => r.embedding?.values || []);
           incMetric("embedding_batch_jobs_succeeded");
           return embeddings;
@@ -273,7 +214,6 @@ export async function generateBatchEmbeddings(texts: string[]): Promise<number[]
   if (asyncResult && asyncResult.length === texts.length) {
     return asyncResult;
   }
-  // Async batch did not return a complete result — fall back to per-item embedding with retries.
   incMetric("embedding_batch_jobs_failed_async");
   logger.warn("asyncBatchEmbedContent did not produce a complete result; falling back to per-item embeddings");
 
@@ -310,87 +250,30 @@ export async function generateBatchEmbeddings(texts: string[]): Promise<number[]
   }
 
   incMetric("embedding_batch_fallback_per_item_used");
-  // At this point, results are non-null arrays
   return results.map((r) => r as number[]);
 }
 
 function extractEmbeddingsFromOperationResponse(resp: any): number[][] | null {
-  // Try multiple common shapes
-  // 1) resp.result?.embeddings
   if (resp?.result?.embeddings && Array.isArray(resp.result.embeddings)) {
     return resp.result.embeddings.map((e: any) => e.values || []);
   }
-  // 2) resp.embeddings
   if (resp?.embeddings && Array.isArray(resp.embeddings)) {
     return resp.embeddings.map((e: any) => e.values || []);
   }
-  // 3) resp.output?.embeddings
   if (resp?.output?.embeddings && Array.isArray(resp.output.embeddings)) {
     return resp.output.embeddings.map((e: any) => e.values || []);
   }
   return null;
 }
 
-/** Store chunks with embeddings in ChromaDB */
-export async function storeChunksInChroma(
+/** Store chunks with embeddings in Qdrant */
+export async function storeChunks(
   collectionName: string,
   chunks: TextChunk[],
   onProgress?: (processed: number, total: number) => void
 ): Promise<{ stored: number; errors: number }> {
-  // If Qdrant is configured, route storage to Qdrant
-  if (isQdrantConfigured()) {
-    // Ensure collection exists with the expected embedding dimension
-    await ensureQdrantCollection(collectionName, EMBEDDING_DIMENSION);
+  await ensureQdrantCollection(collectionName, EMBEDDING_DIMENSION);
 
-    const seen = new Set<string>();
-    const filtered = chunks.filter((c) => {
-      const key = c.text.trim();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-
-    const limit = pLimit(EMBEDDING_CONCURRENCY);
-    const tasks: Promise<{ stored: number; errors: number }>[] = [];
-    for (let i = 0; i < filtered.length; i += BATCH_SIZE) {
-      const batchIndex = i;
-      const batch = filtered.slice(i, i + BATCH_SIZE);
-      const texts = batch.map((c) => c.text);
-
-      const task = limit(async () => {
-        try {
-          const embeddings = await generateBatchEmbeddings(texts);
-          const points = batch.map((c, idx) => ({
-            id: randomUUID(),
-            vector: embeddings[idx],
-            payload: { text: texts[idx], ...c.metadata },
-          }));
-
-          await qdrantUpsertPoints(collectionName, points);
-          if (onProgress) onProgress(Math.min(batchIndex + BATCH_SIZE, filtered.length), filtered.length);
-          return { stored: batch.length, errors: 0 };
-        } catch (error: any) {
-          logger.error({ err: String(error), index: batchIndex }, `[Embeddings][Qdrant] Batch error at index ${batchIndex}`);
-          if (onProgress) onProgress(Math.min(batchIndex + BATCH_SIZE, filtered.length), filtered.length);
-          return { stored: 0, errors: batch.length };
-        }
-      });
-
-      tasks.push(task);
-    }
-
-    const results = await Promise.all(tasks);
-    const stored = results.reduce((s, r) => s + r.stored, 0);
-    const errors = results.reduce((e, r) => e + r.errors, 0);
-    return { stored, errors };
-  }
-
-  // Fallback to Chroma if Qdrant not configured (existing behavior)
-  const collection = await getOrCreateCollection(collectionName);
-  let stored = 0;
-  let errors = 0;
-
-  // Optional deduplication by text content
   const seen = new Set<string>();
   const filtered = chunks.filter((c) => {
     const key = c.text.trim();
@@ -409,28 +292,13 @@ export async function storeChunksInChroma(
     const task = limit(async () => {
       try {
         const embeddings = await generateBatchEmbeddings(texts);
+        const points = batch.map((c, idx) => ({
+          id: randomUUID(),
+          vector: embeddings[idx],
+          payload: { text: texts[idx], ...c.metadata },
+        }));
 
-        const ids = batch.map((c, idx) => `${collectionName}_${batchIndex + idx}_${Date.now()}`);
-        const documents = texts;
-        const metadatas = batch.map((c) => {
-          const flat: Record<string, string | number | boolean> = {};
-          for (const [k, v] of Object.entries(c.metadata)) {
-            if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
-              flat[k] = v;
-            } else if (v !== null && v !== undefined) {
-              flat[k] = String(v);
-            }
-          }
-          return flat;
-        });
-
-        await collection.add({
-          ids,
-          documents,
-          embeddings,
-          metadatas,
-        });
-
+        await qdrantUpsertPoints(collectionName, points);
         if (onProgress) onProgress(Math.min(batchIndex + BATCH_SIZE, filtered.length), filtered.length);
         return { stored: batch.length, errors: 0 };
       } catch (error: any) {
@@ -444,18 +312,19 @@ export async function storeChunksInChroma(
   }
 
   const results = await Promise.all(tasks);
-  stored = results.reduce((s, r) => s + r.stored, 0);
-  errors = results.reduce((e, r) => e + r.errors, 0);
-
+  const stored = results.reduce((s, r) => s + r.stored, 0);
+  const errors = results.reduce((e, r) => e + r.errors, 0);
   return { stored, errors };
 }
 
-/** Query ChromaDB for similar documents */
-export async function queryChroma(
+/** @deprecated Use storeChunks instead */
+export const storeChunksInChroma = storeChunks;
+
+/** Query Qdrant for similar documents */
+export async function queryCollection(
   collectionName: string,
   queryText: string,
   nResults = 10,
-  filter?: Record<string, any>
 ): Promise<{
   documents: string[];
   metadatas: Record<string, any>[];
@@ -463,7 +332,6 @@ export async function queryChroma(
 }> {
   if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
-  // Generate query embedding
   const payload = {
     model: "models/gemini-embedding-001",
     content: { parts: [{ text: queryText }] },
@@ -482,29 +350,16 @@ export async function queryChroma(
   const data = await response.json();
   const queryEmbedding = data.embedding?.values || [];
 
-  // If Qdrant is configured, use it for nearest-neighbor search
-  if (isQdrantConfigured()) {
-    const hits = await qdrantSearchCollection(collectionName, queryEmbedding, nResults, true);
-    return {
-      documents: hits.map((h: any) => (h.payload?.text as string) || ""),
-      metadatas: hits.map((h: any) => h.payload || {}),
-      distances: hits.map((h: any) => (h.score !== null ? h.score : Number.MAX_VALUE)),
-    };
-  }
-
-  const collection = await getOrCreateCollection(collectionName);
-  const results = await collection.query({
-    queryEmbeddings: [queryEmbedding],
-    nResults,
-    where: filter,
-  });
-
+  const hits = await qdrantSearchCollection(collectionName, queryEmbedding, nResults, true);
   return {
-    documents: (results.documents?.[0] || []) as string[],
-    metadatas: (results.metadatas?.[0] || []) as Record<string, any>[],
-    distances: (results.distances?.[0] || []) as number[],
+    documents: hits.map((h: any) => (h.payload?.text as string) || ""),
+    metadatas: hits.map((h: any) => h.payload || {}),
+    distances: hits.map((h: any) => (h.score !== null ? h.score : Number.MAX_VALUE)),
   };
 }
+
+/** @deprecated Use queryCollection instead */
+export const queryChroma = queryCollection;
 
 /** Query multiple collections and merge results */
 export async function queryMultipleCollections(
@@ -524,7 +379,7 @@ export async function queryMultipleCollections(
 
   for (const name of collectionNames) {
     try {
-      const result = await queryChroma(name, queryText, nResults);
+      const result = await queryCollection(name, queryText, nResults);
       for (let i = 0; i < result.documents.length; i++) {
         allDocs.push(result.documents[i]);
         allMetas.push(result.metadatas[i]);
@@ -548,47 +403,36 @@ export async function queryMultipleCollections(
   };
 }
 
-/** Get collection stats */
+/** Get collection stats from Qdrant */
 export async function getCollectionStats(collectionName: string): Promise<{ count: number }> {
   try {
-    const collection = await getOrCreateCollection(collectionName);
-    const count = await collection.count();
-    return { count };
+    const qdrantUrl = process.env.QDRANT_URL || "";
+    if (!qdrantUrl) return { count: 0 };
+    const apiKey = process.env.QDRANT_API_KEY || "";
+    const res = await fetch(`${qdrantUrl.replace(/\/$/, "")}/collections/${encodeURIComponent(collectionName)}`, {
+      headers: { "Content-Type": "application/json", ...(apiKey ? { "api-key": apiKey } : {}) },
+    });
+    if (!res.ok) return { count: 0 };
+    const data: any = await res.json();
+    return { count: Number(data?.result?.points_count ?? 0) };
   } catch {
     return { count: 0 };
   }
 }
 
-/** List all collections (ChromaDB + Qdrant) */
+/** List all Qdrant collections */
 export async function listCollections(): Promise<string[]> {
-  const names = new Set<string>();
-
-  // Try ChromaDB
   try {
-    const client = getChromaClient();
-    const collections = await client.listCollections();
-    for (const c of collections) {
-      names.add(typeof c === 'string' ? c : c.name);
-    }
+    const qdrantUrl = process.env.QDRANT_URL || "";
+    if (!qdrantUrl) return [];
+    const apiKey = process.env.QDRANT_API_KEY || "";
+    const res = await fetch(`${qdrantUrl.replace(/\/$/, "")}/collections`, {
+      headers: { "Content-Type": "application/json", ...(apiKey ? { "api-key": apiKey } : {}) },
+    });
+    if (!res.ok) return [];
+    const data: any = await res.json();
+    return (data?.result?.collections || []).map((c: any) => c.name);
   } catch {
-    // ChromaDB unavailable — skip
+    return [];
   }
-
-  // Qdrant collections
-  if (isQdrantConfigured()) {
-    try {
-      const qdrantUrl = process.env.QDRANT_URL || "http://localhost:6333";
-      const res = await fetch(`${qdrantUrl}/collections`);
-      if (res.ok) {
-        const data: any = await res.json();
-        for (const c of data?.result?.collections || []) {
-          names.add(c.name);
-        }
-      }
-    } catch {
-      // Qdrant unavailable — skip
-    }
-  }
-
-  return Array.from(names);
 }

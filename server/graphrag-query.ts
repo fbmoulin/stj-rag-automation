@@ -4,7 +4,7 @@
  * following the Microsoft GraphRAG architecture.
  */
 import { invokeLLM } from "./_core/llm";
-import { queryChroma, queryMultipleCollections, listCollections } from "./embeddings";
+import { queryCollection, queryMultipleCollections, listCollections } from "./embeddings";
 import { extractQueryEntities } from "./entity-extractor";
 import { getEntityNeighborhood } from "./graph-engine";
 import {

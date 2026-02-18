@@ -3,7 +3,7 @@
  * Extracts text, chunks, and generates embeddings.
  */
 import { chunkText, TextChunk } from "./chunker";
-import { storeChunksInChroma } from "./embeddings";
+import { storeChunks } from "./embeddings";
 import { updateDocument, createLog, updateLog } from "./db";
 
 /** Extract text from a buffer based on MIME type */
@@ -90,7 +90,7 @@ export async function processDocument(
 
     // Step 3: Generate embeddings and store
     await updateDocument(documentId, { status: "embedding" });
-    const result = await storeChunksInChroma(collectionName, chunks);
+    const result = await storeChunks(collectionName, chunks);
 
     await updateDocument(documentId, {
       status: "embedded",

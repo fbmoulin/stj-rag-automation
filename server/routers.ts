@@ -19,7 +19,7 @@ import {
 // Services
 import { syncDatasets, downloadResource, getStaticDatasetList } from "./stj-extractor";
 import { processSTJRecords } from "./chunker";
-import { storeChunksInChroma, getCollectionStats, listCollections } from "./embeddings";
+import { storeChunks, getCollectionStats, listCollections } from "./embeddings";
 import { extractEntitiesFromChunks } from "./entity-extractor";
 import { batchUpsertGraphNodes, batchInsertGraphEdges } from "./db";
 import { buildCommunities, getGraphVisualizationData } from "./graph-engine";
@@ -141,7 +141,7 @@ export const appRouter = router({
           // Generate embeddings
           await updateResourceStatus(input.resourceId, "embedding");
           const collectionName = `stj_${dataset?.slug?.replace(/-/g, "_") || "unknown"}`;
-          const embedResult = await storeChunksInChroma(collectionName, chunks);
+          const embedResult = await storeChunks(collectionName, chunks);
 
           await updateResourceStatus(input.resourceId, "embedded", {
             processedAt: new Date(),
