@@ -559,10 +559,36 @@ export async function getCollectionStats(collectionName: string): Promise<{ coun
   }
 }
 
-/** List all collections */
+/** List all collections (ChromaDB + Qdrant) */
 export async function listCollections(): Promise<string[]> {
-  const client = getChromaClient();
-  const collections = await client.listCollections();
-  // listCollections returns an array of strings (collection names) in newer versions
-  return collections.map((c: any) => typeof c === 'string' ? c : c.name);
+  const names = new Set<string>();
+
+  // Try ChromaDB
+  try {
+    const client = getChromaClient();
+    const collections = await client.listCollections();
+    for (const c of collections) {
+      names.add(typeof c === 'string' ? c : c.name);
+    }
+  } catch {
+    // ChromaDB unavailable — skip
+  }
+
+  // Qdrant collections
+  if (isQdrantConfigured()) {
+    try {
+      const qdrantUrl = process.env.QDRANT_URL || "http://localhost:6333";
+      const res = await fetch(`${qdrantUrl}/collections`);
+      if (res.ok) {
+        const data: any = await res.json();
+        for (const c of data?.result?.collections || []) {
+          names.add(c.name);
+        }
+      }
+    } catch {
+      // Qdrant unavailable — skip
+    }
+  }
+
+  return Array.from(names);
 }
