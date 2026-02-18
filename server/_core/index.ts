@@ -12,6 +12,8 @@ import { createSessionToken } from "./auth";
 import { getSessionCookieOptions } from "./cookies";
 import { ONE_YEAR_MS, COOKIE_NAME } from "@shared/const";
 
+const isProduction = process.env.NODE_ENV === "production";
+
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
     const server = net.createServer();
@@ -83,16 +85,21 @@ async function startServer() {
     serveStatic(app);
   }
 
-  const preferredPort = parseInt(process.env.PORT || "3000");
-  const port = await findAvailablePort(preferredPort);
+  const port = parseInt(process.env.PORT || "3000");
 
-  if (port !== preferredPort) {
-    logger.warn(`Port ${preferredPort} is busy, using port ${port} instead`);
+  if (!isProduction) {
+    const available = await findAvailablePort(port);
+    if (available !== port) {
+      logger.warn(`Port ${port} is busy, using port ${available} instead`);
+    }
+    server.listen(available, () => {
+      logger.info(`Server running on http://localhost:${available}/`);
+    });
+  } else {
+    server.listen(port, "0.0.0.0", () => {
+      logger.info({ port }, "Server running on 0.0.0.0");
+    });
   }
-
-  server.listen(port, () => {
-    logger.info(`Server running on http://localhost:${port}/`);
-  });
 
   // Graceful shutdown
   const shutdown = (signal: string) => {

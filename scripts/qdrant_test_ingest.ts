@@ -21,6 +21,10 @@ async function main() {
       console.log(`progress: ${p}/${t}`);
     });
     console.log("Ingest result:", res);
+    if (res.errors > 0) {
+      console.error("Ingestão de teste falhou: erros detectados no pipeline de embeddings.");
+      process.exit(1);
+    }
   } catch (err: any) {
     console.error("Erro na ingestão de teste:", err);
     process.exit(1);
@@ -31,4 +35,3 @@ main().catch((err) => {
   console.error("Unhandled error in qdrant_test_ingest:", err);
   process.exit(1);
 });
-
