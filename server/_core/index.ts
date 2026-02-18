@@ -6,7 +6,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
-import { serveStatic, setupVite } from "./vite";
+import { serveStatic } from "./static";
 import { logger } from "./logger";
 import { getMetricsSnapshot } from "./metrics";
 
@@ -45,13 +45,6 @@ async function startServer() {
       createContext,
     })
   );
-  // development mode uses Vite, production mode uses static files
-  if (process.env.NODE_ENV === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
-
   // Health check endpoint (used by Docker HEALTHCHECK and Railway)
   app.get("/health", (_req, res) => {
     res.status(200).json({
@@ -66,6 +59,15 @@ async function startServer() {
     res.setHeader("Content-Type", "text/plain; version=0.0.4");
     res.status(200).send(formatPrometheusMetrics());
   });
+
+  // development mode uses Vite, production mode uses static files
+  // MUST be after /health and /metrics — serveStatic registers a catch-all wildcard
+  if (process.env.NODE_ENV === "development") {
+    const { setupVite } = await import("./vite");
+    await setupVite(app, server);
+  } else {
+    serveStatic(app);
+  }
 
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);
