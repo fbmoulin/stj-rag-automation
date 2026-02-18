@@ -3,12 +3,14 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./static";
 import { logger } from "./logger";
 import { getMetricsSnapshot } from "./metrics";
+import { createSessionToken } from "./auth";
+import { getSessionCookieOptions } from "./cookies";
+import { ONE_YEAR_MS, COOKIE_NAME } from "@shared/const";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -35,8 +37,20 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // OAuth callback under /api/oauth/callback
-  registerOAuthRoutes(app);
+  // Password-based login endpoint
+  app.post("/api/auth/login", express.json(), async (req, res) => {
+    const { password } = req.body ?? {};
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (!password || !adminPassword || password !== adminPassword) {
+      res.status(401).json({ error: "Invalid password" });
+      return;
+    }
+    const token = await createSessionToken();
+    const cookieOptions = getSessionCookieOptions(req);
+    res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+    res.json({ ok: true });
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",
