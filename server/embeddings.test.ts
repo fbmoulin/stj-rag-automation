@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
-import { fetchWithRetry, generateBatchEmbeddings, storeChunksInChroma } from "./embeddings";
+import { fetchWithRetry } from "./embeddings";
 import { getMetricsSnapshot, resetMetrics } from "./_core/metrics";
 
 beforeEach(() => {
@@ -25,13 +25,19 @@ describe("fetchWithRetry", () => {
 
 describe("generateBatchEmbeddings", () => {
   it("returns embeddings for texts", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "test-key");
+    vi.resetModules();
+
     const embeddingsResp = { embeddings: [{ values: [0.1, 0.2, 0.3] }] };
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => embeddingsResp });
     // @ts-ignore
     global.fetch = fetchMock;
 
-    const result = await generateBatchEmbeddings(["hello"]);
+    const { generateBatchEmbeddings: genBatch } = await import("./embeddings");
+    const result = await genBatch(["hello"]);
     expect(result).toEqual([[0.1, 0.2, 0.3]]);
+
+    vi.unstubAllEnvs();
   });
 });
 
