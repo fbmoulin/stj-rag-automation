@@ -18,14 +18,11 @@ import {
 
 // Services
 import { syncDatasets, downloadResource, getStaticDatasetList } from "./stj-extractor";
-import { processSTJRecords } from "./chunker";
-import { storeChunks, getCollectionStats, listCollections } from "./embeddings";
-import { extractEntitiesFromChunks } from "./entity-extractor";
-import { batchUpsertGraphNodes, batchInsertGraphEdges } from "./db";
+import { getCollectionStats, listCollections } from "./embeddings";
 import { buildCommunities, getGraphVisualizationData } from "./graph-engine";
 import { graphRAGQuery } from "./graphrag-query";
-import { processDocument as processDocumentService, extractText } from "./document-processor";
-import { updateResourceStatus, createLog, updateLog } from "./db";
+import { updateResourceStatus } from "./db";
+import { enqueueResourceProcess, enqueueDocumentProcess, getResourceQueue } from "./queue/queues";
 
 export const appRouter = router({
   system: systemRouter,
@@ -89,100 +86,40 @@ export const appRouter = router({
         const resource = await getResourceByResourceId(input.resourceId);
         if (!resource) throw new Error("Resource not found");
 
-        const startTime = Date.now();
-        const logId = await createLog({
-          action: "process_json",
-          resourceId: input.resourceId,
-          status: "started",
-          details: `Processing resource ${resource.name}`,
-        });
-
-        try {
-          // Download the data
-          await updateResourceStatus(input.resourceId, "downloading");
-          const data = await downloadResource(input.resourceId);
-
-          // Get dataset info
-          const dataset = await getDatasetBySlug(
-            (await getAllDatasets()).find(d => d.id === resource.datasetId)?.slug || ""
-          );
-
-          // Process into chunks
-          await updateResourceStatus(input.resourceId, "processing");
-          const chunks = processSTJRecords(data, dataset?.slug || "unknown", resource.name);
-
-          // Extract entities from chunks (GraphRAG)
-          await updateResourceStatus(input.resourceId, "extracting_entities");
-          const extraction = await extractEntitiesFromChunks(chunks.slice(0, 50)); // Limit for performance
-
-          // Store entities in graph
-          await batchUpsertGraphNodes(
-            extraction.entities.map(e => ({
-              entityId: e.entityId,
-              name: e.name,
-              entityType: e.entityType,
-              description: e.description,
-              source: "stj",
-              sourceRef: dataset?.slug || input.resourceId,
-            }))
-          );
-
-          await batchInsertGraphEdges(
-            extraction.relationships.map(r => ({
-              sourceEntityId: r.sourceEntityId,
-              targetEntityId: r.targetEntityId,
-              relationshipType: r.relationshipType,
-              description: r.description,
-              weight: r.weight,
-              sourceRef: dataset?.slug || input.resourceId,
-            }))
-          );
-
-          // Generate embeddings
-          await updateResourceStatus(input.resourceId, "embedding");
-          const collectionName = `stj_${dataset?.slug?.replace(/-/g, "_") || "unknown"}`;
-          const embedResult = await storeChunks(collectionName, chunks);
-
-          await updateResourceStatus(input.resourceId, "embedded", {
-            processedAt: new Date(),
-            embeddedAt: new Date(),
-            recordCount: data.length,
-            chunkCount: chunks.length,
-            entityCount: extraction.entities.length,
-            relationshipCount: extraction.relationships.length,
-          });
-
-          const duration = Date.now() - startTime;
-          if (logId) {
-            await updateLog(logId, {
-              status: "completed",
-              recordsProcessed: data.length,
-              chunksGenerated: chunks.length,
-              entitiesExtracted: extraction.entities.length,
-              relationshipsExtracted: extraction.relationships.length,
-              embeddingsGenerated: embedResult.stored,
-              durationMs: duration,
-            });
-          }
-
-          return {
-            records: data.length,
-            chunks: chunks.length,
-            entities: extraction.entities.length,
-            relationships: extraction.relationships.length,
-            embeddings: embedResult.stored,
-          };
-        } catch (error: any) {
-          await updateResourceStatus(input.resourceId, "error", { errorMessage: error.message });
-          if (logId) {
-            await updateLog(logId, {
-              status: "failed",
-              durationMs: Date.now() - startTime,
-              errorMessage: error.message,
-            });
-          }
-          throw error;
+        // Queue async job if Redis is available
+        const jobId = await enqueueResourceProcess(input.resourceId);
+        if (jobId) {
+          await updateResourceStatus(input.resourceId, "queued");
+          return { jobId, status: "queued" as const, resourceId: input.resourceId };
         }
+
+        // Fallback: synchronous processing (no Redis)
+        throw new Error("Async processing required — REDIS_URL not configured");
+      }),
+    status: publicProcedure
+      .input(z.object({ resourceId: z.string() }))
+      .query(async ({ input }) => {
+        const resource = await getResourceByResourceId(input.resourceId);
+        if (!resource) throw new Error("Resource not found");
+
+        // Try to get job progress from BullMQ
+        const queue = getResourceQueue();
+        let jobProgress: number | undefined;
+        if (queue) {
+          const jobs = await queue.getJobs(["active", "waiting", "completed", "failed"]);
+          const job = jobs.find(j => j.data.resourceId === input.resourceId);
+          if (job) {
+            const progress = job.progress;
+            jobProgress = typeof progress === "number" ? progress : undefined;
+          }
+        }
+
+        return {
+          resourceId: input.resourceId,
+          status: resource.status,
+          progress: jobProgress,
+          error: resource.errorMessage || undefined,
+        };
       }),
   }),
 
@@ -226,20 +163,14 @@ export const appRouter = router({
         const doc = await getDocumentById(input.documentId);
         if (!doc) throw new Error("Document not found");
 
-        // Fetch the file from S3
-        const response = await fetch(doc.fileUrl!);
-        const buffer = Buffer.from(await response.arrayBuffer());
+        // Queue async job if Redis is available
+        const jobId = await enqueueDocumentProcess(input.documentId);
+        if (jobId) {
+          return { jobId, status: "queued" as const, documentId: input.documentId };
+        }
 
-        const collectionName = `doc_${input.documentId}`;
-        const result = await processDocumentService(
-          input.documentId,
-          buffer,
-          doc.mimeType,
-          doc.filename,
-          collectionName
-        );
-
-        return result;
+        // Fallback: synchronous processing (no Redis)
+        throw new Error("Async processing required — REDIS_URL not configured");
       }),
   }),
 

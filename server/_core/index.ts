@@ -11,6 +11,9 @@ import { getMetricsSnapshot } from "./metrics";
 import { createSessionToken } from "./auth";
 import { getSessionCookieOptions } from "./cookies";
 import { ONE_YEAR_MS, COOKIE_NAME } from "@shared/const";
+import { startWorkers, stopWorkers } from "../queue/worker";
+import { closeQueues } from "../queue/queues";
+import { closeRedis } from "../queue/connection";
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -101,9 +104,15 @@ async function startServer() {
     });
   }
 
+  // Start BullMQ workers (no-op if REDIS_URL not set)
+  startWorkers();
+
   // Graceful shutdown
-  const shutdown = (signal: string) => {
-    logger.info({ signal }, "Received shutdown signal, closing server...");
+  const shutdown = async (signal: string) => {
+    logger.info({ signal }, "Received shutdown signal, closing...");
+    await stopWorkers();
+    await closeQueues();
+    await closeRedis();
     server.close(() => {
       logger.info("Server closed gracefully");
       process.exit(0);
