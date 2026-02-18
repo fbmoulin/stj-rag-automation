@@ -1,0 +1,16 @@
+node_modules
+.worktrees
+.git
+.gitignore
+.gitattributes
+docs
+*.md
+!README.md
+.env
+.env.*
+.vscode
+*.test.ts
+*.spec.ts
+vitest.config.ts
+PROJECT_INDEX.json
+DEPLOY_PLAN.md

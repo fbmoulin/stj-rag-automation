@@ -52,6 +52,15 @@ async function startServer() {
     serveStatic(app);
   }
 
+  // Health check endpoint (used by Docker HEALTHCHECK and Railway)
+  app.get("/health", (_req, res) => {
+    res.status(200).json({
+      status: "ok",
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+    });
+  });
+
   // Metrics endpoint (Prometheus text format)
   app.get("/metrics", (_req, res) => {
     res.setHeader("Content-Type", "text/plain; version=0.0.4");
@@ -68,6 +77,22 @@ async function startServer() {
   server.listen(port, () => {
     logger.info(`Server running on http://localhost:${port}/`);
   });
+
+  // Graceful shutdown
+  const shutdown = (signal: string) => {
+    logger.info({ signal }, "Received shutdown signal, closing server...");
+    server.close(() => {
+      logger.info("Server closed gracefully");
+      process.exit(0);
+    });
+    setTimeout(() => {
+      logger.warn("Forcing shutdown after timeout");
+      process.exit(1);
+    }, 10_000).unref();
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
 // Expose a simple /metrics Prometheus-format endpoint

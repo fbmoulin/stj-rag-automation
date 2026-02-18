@@ -66,6 +66,20 @@ Checklist rápido (preflight)
 - [ ] Build passa e testes verdes
 - [ ] Backup/restore testado para DB
 
+## Railway Setup Steps
+
+1. `railway login --browserless` (from WSL2)
+2. `railway init` or link to existing project
+3. Set environment variables in Railway dashboard:
+   - `DATABASE_URL` (MySQL connection string)
+   - `JWT_SECRET` (random 32+ char string)
+   - `GEMINI_API_KEY`
+   - `QDRANT_URL` (Qdrant service URL)
+   - `NODE_ENV=production`
+   - `PORT=3000`
+4. Deploy: `railway up` or push to connected GitHub repo
+5. Verify: `curl https://<your-app>.up.railway.app/health`
+
 Notas operacionais
 
 - Evitar expor keys publicamente. Usar service secrets.

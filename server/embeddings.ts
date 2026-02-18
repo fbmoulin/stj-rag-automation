@@ -486,9 +486,9 @@ export async function queryChroma(
   if (isQdrantConfigured()) {
     const hits = await qdrantSearchCollection(collectionName, queryEmbedding, nResults, true);
     return {
-      documents: hits.map((h) => (h.payload?.text as string) || ""),
-      metadatas: hits.map((h) => h.payload || {}),
-      distances: hits.map((h) => (h.score !== null ? h.score : Number.MAX_VALUE)),
+      documents: hits.map((h: any) => (h.payload?.text as string) || ""),
+      metadatas: hits.map((h: any) => h.payload || {}),
+      distances: hits.map((h: any) => (h.score !== null ? h.score : Number.MAX_VALUE)),
     };
   }
 
