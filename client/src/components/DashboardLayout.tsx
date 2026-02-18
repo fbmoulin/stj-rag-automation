@@ -6,6 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import {
   Sidebar,
   SidebarContent,
@@ -19,7 +20,6 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
   LayoutDashboard, Database, Upload, Network, MessageSquare,
@@ -53,11 +53,38 @@ export default function DashboardLayout({
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
-  const { loading, user } = useAuth();
+  const { loading, user, refresh } = useAuth();
+  const [password, setPassword] = useState("");
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginLoading, setLoginLoading] = useState(false);
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
   }, [sidebarWidth]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginLoading(true);
+    setLoginError(null);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        setLoginError("Senha incorreta. Tente novamente.");
+        return;
+      }
+      setPassword("");
+      await refresh();
+    } catch {
+      setLoginError("Erro ao conectar. Tente novamente.");
+    } finally {
+      setLoginLoading(false);
+    }
+  };
 
   if (loading) {
     return <DashboardLayoutSkeleton />;
@@ -83,15 +110,27 @@ export default function DashboardLayout({
               Acesse a plataforma de inteligência jurídica com GraphRAG para análise de precedentes do STJ.
             </p>
           </div>
-          <Button
-            onClick={() => {
-              window.location.href = getLoginUrl();
-            }}
-            size="lg"
-            className="w-full gradient-orange text-white font-semibold shadow-lg hover:shadow-xl transition-all"
-          >
-            Entrar
-          </Button>
+          <form onSubmit={handleLogin} className="w-full flex flex-col gap-3">
+            <Input
+              type="password"
+              placeholder="Senha de acesso"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              autoFocus
+              className="h-11"
+            />
+            {loginError && (
+              <p className="text-sm text-destructive text-center">{loginError}</p>
+            )}
+            <Button
+              type="submit"
+              disabled={loginLoading || !password}
+              size="lg"
+              className="w-full gradient-orange text-white font-semibold shadow-lg hover:shadow-xl transition-all"
+            >
+              {loginLoading ? "Entrando..." : "Entrar"}
+            </Button>
+          </form>
         </div>
       </div>
     );
