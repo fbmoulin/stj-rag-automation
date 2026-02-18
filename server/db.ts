@@ -8,7 +8,6 @@ import type {
   InsertDataset, InsertResource, InsertDocument, InsertExtractionLog, InsertRagQuery,
   InsertGraphNode, InsertGraphEdge, InsertCommunity,
 } from "../drizzle/schema";
-import { ENV } from './_core/env';
 import { logger } from "./_core/logger";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -39,7 +38,6 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     textFields.forEach(assignNullable);
     if (user.lastSignedIn !== undefined) { values.lastSignedIn = user.lastSignedIn; updateSet.lastSignedIn = user.lastSignedIn; }
     if (user.role !== undefined) { values.role = user.role; updateSet.role = user.role; }
-    else if (user.openId === ENV.ownerOpenId) { values.role = 'admin'; updateSet.role = 'admin'; }
     if (!values.lastSignedIn) values.lastSignedIn = new Date();
     if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
     await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
