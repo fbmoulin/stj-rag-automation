@@ -77,9 +77,16 @@
 - [x] GitHub Actions CI (.github/workflows/ci.yml)
 - [x] railway.toml
 
+## Deploy (DONE — Railway live)
+
+- [x] Provision Railway MySQL + Qdrant Cloud + Supabase bucket
+- [x] Deploy to Railway (`stj-rag-production.up.railway.app`)
+- [x] Healthcheck passing (`GET /health`)
+- [x] ESLint 10 + @typescript-eslint 8.56 (flat config, 0 errors)
+- [x] Pino structured logger (silent in test, pretty in dev, JSON in prod)
+
 ## Pending
 
-- [ ] Deploy: provision Railway MySQL + Qdrant Cloud + Supabase bucket
 - [ ] Integration tests for full pipeline
 - [ ] tRPC router tests
 - [ ] Incremental download with version control for STJ datasets

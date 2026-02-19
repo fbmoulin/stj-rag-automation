@@ -87,7 +87,7 @@ See `CLAUDE.md` for full architecture documentation.
 
 See `DEPLOY_PLAN.md` for the detailed deploy plan (Docker, Railway, migrations, rollback).
 
-## Recent Changes (v1.0.1)
+## Recent Changes (v1.0.2)
 
 - Replaced Manus platform dependencies with self-hosted auth (JWT), storage (Supabase), LLM (Gemini direct)
 - Removed ChromaDB — Qdrant is the sole vector store

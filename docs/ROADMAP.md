@@ -50,16 +50,17 @@
 - [x] GitHub Actions CI (.github/workflows/ci.yml)
 - [x] railway.toml with /health healthcheck
 
-## Phase 6 — Production Deploy (NEXT)
+## Phase 6 — Production Deploy (DONE)
 
-- [ ] Provision Railway MySQL (or managed MySQL)
-- [ ] Set up Qdrant Cloud (free tier)
-- [ ] Create Supabase Storage bucket `documents` (private)
-- [ ] Set Railway env vars and deploy
-- [ ] Run migration: `railway run pnpm drizzle-kit migrate`
-- [ ] Smoke test: `curl https://<app>.up.railway.app/health`
+- [x] Provision Railway MySQL (internal networking)
+- [x] Set up Qdrant Cloud (free tier)
+- [x] Create Supabase Storage bucket `documents` (private)
+- [x] Set Railway env vars and deploy
+- [x] Healthcheck passing: `curl https://stj-rag-production.up.railway.app/health`
+- [x] ESLint 10 + @typescript-eslint 8.56 (flat config, 0 errors)
+- [x] Pino structured logger (silent in test, pretty in dev, JSON in prod)
 
-## Phase 7 — Enhancements (FUTURE)
+## Phase 7 — Enhancements (NEXT)
 
 - [ ] Integration tests for full pipeline
 - [ ] tRPC router tests
