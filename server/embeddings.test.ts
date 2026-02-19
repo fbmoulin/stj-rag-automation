@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { fetchWithRetry } from "./embeddings";
-import { getMetricsSnapshot, resetMetrics } from "./_core/metrics";
+import { resetMetrics } from "./_core/metrics";
 
 beforeEach(() => {
   vi.restoreAllMocks();
@@ -13,7 +13,7 @@ describe("fetchWithRetry", () => {
     fetchMock
       .mockResolvedValueOnce({ ok: false, status: 500, text: async () => "err" })
       .mockResolvedValueOnce({ ok: true, json: async () => ({ success: true }) });
-    // @ts-ignore
+    // @ts-expect-error — mock global fetch
     global.fetch = fetchMock;
 
     const res = await fetchWithRetry("https://example.com", { method: "POST" });
@@ -30,7 +30,7 @@ describe("generateBatchEmbeddings", () => {
 
     const embeddingsResp = { embeddings: [{ values: [0.1, 0.2, 0.3] }] };
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => embeddingsResp });
-    // @ts-ignore
+    // @ts-expect-error — mock global fetch
     global.fetch = fetchMock;
 
     const { generateBatchEmbeddings: genBatch } = await import("./embeddings");

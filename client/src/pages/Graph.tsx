@@ -249,7 +249,7 @@ function GraphCanvas({
 
     // Assign positions using simple force layout
     const nodePositions = new Map<string, { x: number; y: number }>();
-    const nodeMap = new Map(nodes.map(n => [n.id, n]));
+    const _nodeMap = new Map(nodes.map(n => [n.id, n]));
 
     nodes.forEach((n, i) => {
       const angle = (i / nodes.length) * 2 * Math.PI;

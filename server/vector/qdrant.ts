@@ -4,7 +4,7 @@
  */
 import { logger } from "../_core/logger";
 
-const DEFAULT_TIMEOUT_MS = 10_000;
+const _DEFAULT_TIMEOUT_MS = 10_000;
 
 function getQdrantUrl() {
   return process.env.QDRANT_URL || "";

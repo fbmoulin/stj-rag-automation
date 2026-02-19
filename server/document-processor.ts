@@ -2,7 +2,7 @@
  * Document Processor - Handles uploaded PDF, DOCX, TXT files
  * Extracts text, chunks, and generates embeddings.
  */
-import { chunkText, TextChunk } from "./chunker";
+import { chunkText } from "./chunker";
 import { storeChunks } from "./embeddings";
 import { updateDocument, createLog, updateLog } from "./db";
 

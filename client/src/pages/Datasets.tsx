@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
-  Database, RefreshCw, Download, Cog, Loader2, ExternalLink, ChevronDown, ChevronUp,
+  Database, RefreshCw, Cog, Loader2, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { useState } from "react";
 

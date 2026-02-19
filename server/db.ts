@@ -1,4 +1,4 @@
-import { eq, desc, sql, and, inArray, like } from "drizzle-orm";
+import { eq, desc, sql, and, like } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser, users, datasets, resources, documents, extractionLogs, ragQueries,

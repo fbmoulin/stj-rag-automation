@@ -4,12 +4,11 @@
  * following the Microsoft GraphRAG architecture.
  */
 import { invokeLLM } from "./_core/llm";
-import { queryCollection, queryMultipleCollections, listCollections } from "./embeddings";
+import { queryMultipleCollections, listCollections } from "./embeddings";
 import { extractQueryEntities } from "./entity-extractor";
-import { getEntityNeighborhood } from "./graph-engine";
 import {
   searchGraphNodes, getEdgesForEntity, getAllCommunities,
-  getCommunityById, createRagQuery, updateRagQuery, createLog, updateLog,
+  createRagQuery, updateRagQuery, createLog, updateLog,
 } from "./db";
 
 export interface GraphRAGResult {
@@ -135,7 +134,7 @@ async function localSearch(query: string): Promise<{
 }
 
 /** GLOBAL SEARCH: Use community summaries for broad queries */
-async function globalSearch(query: string): Promise<{
+async function globalSearch(_query: string): Promise<{
   communityReports: { title: string; summary: string }[];
   context: string;
   reasoningChain: string;

@@ -1,5 +1,3 @@
-import { ENV } from "./env";
-
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
 export type TextContent = {

@@ -161,7 +161,7 @@ export async function extractEntitiesFromChunks(
   chunks: TextChunk[],
   onProgress?: (processed: number, total: number) => void
 ): Promise<ExtractionResult> {
-  const allEntities: ExtractedEntity[] = [];
+  const _allEntities: ExtractedEntity[] = [];
   const allRelationships: ExtractedRelationship[] = [];
   const entityMap = new Map<string, ExtractedEntity>();
 
