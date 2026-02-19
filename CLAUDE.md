@@ -15,6 +15,8 @@ Full-stack GraphRAG system for Brazilian STJ jurisprudence. Ingests open data fr
 - **LLM:** Gemini API direct (`GEMINI_API_KEY`)
 - **Package manager:** pnpm 10.4.1
 - **Test runner:** Vitest 2
+- **Linter:** ESLint 10 + @typescript-eslint 8.56 (flat config, `eslint.config.mjs`)
+- **Deploy:** Railway (`stj-rag-production.up.railway.app`)
 
 ## Critical Rules
 
@@ -30,6 +32,8 @@ pnpm dev              # Dev server (http://localhost:3000)
 pnpm build            # Build for production
 pnpm test             # Run all tests (vitest run)
 pnpm run check        # TypeScript type check
+pnpm lint             # ESLint (0 errors, warnings only)
+pnpm lint:fix         # ESLint with auto-fix
 ```
 
 ## Tests (59 passing, 10 suites)
@@ -94,7 +98,7 @@ vi.mock("./db", () => ({
 | `auth.ts` | JWT session tokens (30d), cookie-based auth |
 | `cookies.ts` | Cookie options (httpOnly, sameSite: lax, secure) |
 | `env.ts` | Startup env validation (fail fast in production) |
-| `logger.ts` | Pino structured logger |
+| `logger.ts` | Pino structured logger (silent in test, pretty in dev, JSON in prod) |
 | `context.ts` | tRPC context creation |
 
 ### Database (MySQL 8, 9 tables)
@@ -117,6 +121,7 @@ Optional: `QDRANT_API_KEY`, `NODE_ENV`, `PORT`
 - `docker-compose.yml` — MySQL 8 + App + Qdrant (healthchecks, service_healthy depends_on)
 - `.github/workflows/ci.yml` — GitHub Actions (test + typecheck + build)
 - `railway.toml` — Railway deploy config (/health healthcheck)
+- **Live:** `https://stj-rag-production.up.railway.app` (MySQL + Qdrant Cloud + Supabase)
 - `DEPLOY_PLAN.md` — detailed deploy plan
 
 ## Coding Patterns

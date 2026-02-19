@@ -11,7 +11,9 @@ Full-stack GraphRAG system for Brazilian STJ jurisprudence. Ingests open data fr
 - **Auth:** JWT password-based (`jose`) + cookie sessions (30d, sameSite: lax)
 - **Storage:** Supabase Storage (S3-compatible)
 - **Observability:** Pino structured logs + `/metrics` (Prometheus format) + `/health`
+- **Linting:** ESLint 10 + @typescript-eslint 8.56 + Prettier
 - **CI/CD:** GitHub Actions (test + typecheck + build)
+- **Deploy:** Railway (live at `stj-rag-production.up.railway.app`)
 
 ## Quick Start
 
@@ -20,6 +22,7 @@ pnpm install          # Install dependencies
 pnpm dev              # Dev server (http://localhost:3000)
 pnpm test             # Run all tests (59 passing, 10 suites)
 pnpm run check        # TypeScript type check (0 errors)
+pnpm lint             # ESLint (0 errors)
 pnpm build            # Build for production
 ```
 
@@ -92,4 +95,6 @@ See `DEPLOY_PLAN.md` for the detailed deploy plan (Docker, Railway, migrations, 
 - Hardened security: timing-safe password comparison, Supabase error handling, 30d session duration, sameSite: lax cookies
 - Added DB indexes, combined dashboard stats query, RAG rate limiting
 - Added /health endpoint, graceful shutdown, env validation, .dockerignore
-- Fixed 12 TS errors, upload limits, storage null crash
+- Added ESLint + TypeScript ESLint (0 errors, flat config)
+- Enhanced logger: silent in test, pretty in dev, JSON in prod
+- Deployed to Railway (`stj-rag-production.up.railway.app`)
