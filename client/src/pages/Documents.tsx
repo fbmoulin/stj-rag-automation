@@ -108,7 +108,7 @@ export default function Documents() {
 function DocumentRow({ doc, onRefresh }: { doc: any; onRefresh: () => void }) {
   const processMutation = trpc.documents.process.useMutation({
     onSuccess: (data) => {
-      toast.success(`Processado: ${data.chunks} chunks, ${data.embeddings} embeddings`);
+      toast.success(`Job ${data.jobId} enfileirado (${data.status})`);
       onRefresh();
     },
     onError: (e) => toast.error(`Erro: ${e.message}`),

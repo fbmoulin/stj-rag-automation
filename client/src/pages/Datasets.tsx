@@ -136,9 +136,7 @@ function DatasetCard({ dataset }: { dataset: any }) {
 function ResourceRow({ resource }: { resource: any }) {
   const processMutation = trpc.resources.process.useMutation({
     onSuccess: (data) => {
-      toast.success(
-        `Processado: ${data.records} registos, ${data.chunks} chunks, ${data.entities} entidades, ${data.relationships} relações`
-      );
+      toast.success(`Job ${data.jobId} enfileirado (${data.status})`);
     },
     onError: (e) => toast.error(`Erro: ${e.message}`),
   });

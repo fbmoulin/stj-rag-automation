@@ -149,7 +149,7 @@ export function startWorkers(): void {
   const resourceWorker = new Worker<ResourceProcessJob>(
     QUEUE_NAMES.RESOURCE_PROCESS,
     handleResourceProcess,
-    { connection, concurrency: 1 },
+    { connection: connection as any, concurrency: 1 },
   );
   resourceWorker.on("failed", (job, err) => {
     logger.error({ jobId: job?.id, err: String(err) }, "[Worker] Resource job failed");
@@ -158,7 +158,7 @@ export function startWorkers(): void {
   const documentWorker = new Worker<DocumentProcessJob>(
     QUEUE_NAMES.DOCUMENT_PROCESS,
     handleDocumentProcess,
-    { connection, concurrency: 2 },
+    { connection: connection as any, concurrency: 2 },
   );
   documentWorker.on("failed", (job, err) => {
     logger.error({ jobId: job?.id, err: String(err) }, "[Worker] Document job failed");

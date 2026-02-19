@@ -35,18 +35,26 @@ export async function storagePut(
     throw new Error(`Storage upload failed: ${error.message}`);
   }
 
-  const { data: signedData } = await supabase.storage
+  const { data: signedData, error: signError } = await supabase.storage
     .from(BUCKET)
     .createSignedUrl(key, 3600);
 
-  return { key, url: signedData!.signedUrl };
+  if (signError || !signedData) {
+    throw new Error(`Failed to create signed URL: ${signError?.message ?? "unknown error"}`);
+  }
+
+  return { key, url: signedData.signedUrl };
 }
 
 export async function storageGet(relKey: string): Promise<{ key: string; url: string }> {
   const supabase = getSupabase();
   const key = normalizeKey(relKey);
 
-  const { data } = await supabase.storage.from(BUCKET).createSignedUrl(key, 3600);
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(key, 3600);
 
-  return { key, url: data!.signedUrl };
+  if (error || !data) {
+    throw new Error(`Failed to create signed URL: ${error?.message ?? "unknown error"}`);
+  }
+
+  return { key, url: data.signedUrl };
 }

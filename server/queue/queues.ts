@@ -25,7 +25,7 @@ export function getResourceQueue(): Queue<ResourceProcessJob> | null {
   if (_resourceQueue) return _resourceQueue;
   const connection = getRedisConnection();
   if (!connection) return null;
-  _resourceQueue = new Queue<ResourceProcessJob>(QUEUE_NAMES.RESOURCE_PROCESS, { connection });
+  _resourceQueue = new Queue(QUEUE_NAMES.RESOURCE_PROCESS, { connection: connection as any }) as Queue<ResourceProcessJob>;
   return _resourceQueue;
 }
 
@@ -33,7 +33,7 @@ export function getDocumentQueue(): Queue<DocumentProcessJob> | null {
   if (_documentQueue) return _documentQueue;
   const connection = getRedisConnection();
   if (!connection) return null;
-  _documentQueue = new Queue<DocumentProcessJob>(QUEUE_NAMES.DOCUMENT_PROCESS, { connection });
+  _documentQueue = new Queue(QUEUE_NAMES.DOCUMENT_PROCESS, { connection: connection as any }) as Queue<DocumentProcessJob>;
   return _documentQueue;
 }
 

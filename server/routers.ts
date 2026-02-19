@@ -133,9 +133,9 @@ export const appRouter = router({
     }),
     upload: protectedProcedure
       .input(z.object({
-        filename: z.string(),
-        mimeType: z.string(),
-        base64Data: z.string(),
+        filename: z.string().max(500),
+        mimeType: z.string().max(100),
+        base64Data: z.string().max(10_485_760), // ~7.5 MB file limit (base64 overhead)
       }))
       .mutation(async ({ input, ctx }) => {
         const buffer = Buffer.from(input.base64Data, "base64");
