@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, bigint, float, uniqueIndex } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, bigint, float, uniqueIndex, index } from "drizzle-orm/mysql-core";
 
 // ─── Users ───────────────────────────────────────────────────────────────────
 
@@ -63,7 +63,10 @@ export const resources = mysqlTable("resources", {
   errorMessage: text("errorMessage"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (t) => ([
+  index("idx_resources_status").on(t.status),
+  index("idx_resources_datasetId").on(t.datasetId),
+]));
 
 export type Resource = typeof resources.$inferSelect;
 export type InsertResource = typeof resources.$inferInsert;
@@ -91,7 +94,9 @@ export const documents = mysqlTable("documents", {
   collectionName: varchar("collectionName", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (t) => ([
+  index("idx_documents_userId").on(t.userId),
+]));
 
 export type Document = typeof documents.$inferSelect;
 export type InsertDocument = typeof documents.$inferInsert;
@@ -122,7 +127,10 @@ export const graphNodes = mysqlTable("graphNodes", {
   metadata: json("metadata"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (t) => ([
+  index("idx_graphNodes_entityType").on(t.entityType),
+  index("idx_graphNodes_communityId").on(t.communityId),
+]));
 
 export type GraphNode = typeof graphNodes.$inferSelect;
 export type InsertGraphNode = typeof graphNodes.$inferInsert;
@@ -147,7 +155,11 @@ export const graphEdges = mysqlTable("graphEdges", {
   mentionCount: int("mentionCount").default(1),
   metadata: json("metadata"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => ([
+  index("idx_graphEdges_sourceEntityId").on(t.sourceEntityId),
+  index("idx_graphEdges_targetEntityId").on(t.targetEntityId),
+  index("idx_graphEdges_relationshipType").on(t.relationshipType),
+]));
 
 export type GraphEdge = typeof graphEdges.$inferSelect;
 export type InsertGraphEdge = typeof graphEdges.$inferInsert;

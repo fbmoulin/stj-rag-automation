@@ -4,6 +4,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { storagePut } from "./storage";
+import { checkRateLimit } from "./rate-limit";
 import { nanoid } from "nanoid";
 
 // DB helpers
@@ -227,6 +228,10 @@ export const appRouter = router({
     query: protectedProcedure
       .input(z.object({ query: z.string().min(3) }))
       .mutation(async ({ input, ctx }) => {
+        const limit = checkRateLimit(`rag:${ctx.user.id}`, 10, 60_000);
+        if (!limit.allowed) {
+          throw new Error(`Rate limit exceeded. Try again in ${Math.ceil(limit.retryAfterMs / 1000)}s`);
+        }
         return graphRAGQuery(input.query, ctx.user.id);
       }),
     history: protectedProcedure

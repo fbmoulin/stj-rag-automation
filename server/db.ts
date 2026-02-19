@@ -345,21 +345,25 @@ export async function getDashboardStats() {
   const db = await getDb();
   if (!db) return { datasets: 0, resources: 0, documents: 0, entities: 0, relationships: 0, communities: 0, queries: 0 };
 
-  const [dsCount] = await db.select({ count: sql<number>`count(*)` }).from(datasets);
-  const [resCount] = await db.select({ count: sql<number>`count(*)` }).from(resources);
-  const [docCount] = await db.select({ count: sql<number>`count(*)` }).from(documents);
-  const [nodeCount] = await db.select({ count: sql<number>`count(*)` }).from(graphNodes);
-  const [edgeCount] = await db.select({ count: sql<number>`count(*)` }).from(graphEdges);
-  const [commCount] = await db.select({ count: sql<number>`count(*)` }).from(communities);
-  const [qCount] = await db.select({ count: sql<number>`count(*)` }).from(ragQueries);
+  const rows = await db.execute(sql`
+    SELECT
+      (SELECT count(*) FROM datasets) AS datasets,
+      (SELECT count(*) FROM resources) AS resources,
+      (SELECT count(*) FROM documents) AS documents,
+      (SELECT count(*) FROM graphNodes) AS entities,
+      (SELECT count(*) FROM graphEdges) AS relationships,
+      (SELECT count(*) FROM communities) AS communities,
+      (SELECT count(*) FROM ragQueries) AS queries
+  `);
 
+  const r = (rows as unknown as Record<string, unknown>[])[0];
   return {
-    datasets: Number(dsCount.count),
-    resources: Number(resCount.count),
-    documents: Number(docCount.count),
-    entities: Number(nodeCount.count),
-    relationships: Number(edgeCount.count),
-    communities: Number(commCount.count),
-    queries: Number(qCount.count),
+    datasets: Number(r.datasets ?? 0),
+    resources: Number(r.resources ?? 0),
+    documents: Number(r.documents ?? 0),
+    entities: Number(r.entities ?? 0),
+    relationships: Number(r.relationships ?? 0),
+    communities: Number(r.communities ?? 0),
+    queries: Number(r.queries ?? 0),
   };
 }
