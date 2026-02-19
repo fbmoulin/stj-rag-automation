@@ -32,6 +32,17 @@ services:
       retries: 3
       start_period: 5s
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   app:
     build: .
     restart: unless-stopped
@@ -40,6 +51,8 @@ services:
         condition: service_healthy
       qdrant:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "3000:3000"
     environment:
@@ -47,9 +60,13 @@ services:
       PORT: "3000"
       DATABASE_URL: mysql://${MYSQL_USER:-stj}:${MYSQL_PASSWORD:-stjpassword}@db:3306/${MYSQL_DATABASE:-stj_rag_db}
       JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       QDRANT_URL: http://qdrant:6333
       QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+      REDIS_URL: redis://redis:6379
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY:-}
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1"]
       interval: 15s

@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { timingSafeEqual } from "crypto";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
@@ -46,7 +47,13 @@ async function startServer() {
   app.post("/api/auth/login", express.json(), async (req, res) => {
     const { password } = req.body ?? {};
     const adminPassword = process.env.ADMIN_PASSWORD;
-    if (!password || !adminPassword || password !== adminPassword) {
+    if (!password || !adminPassword) {
+      res.status(401).json({ error: "Invalid password" });
+      return;
+    }
+    const pwdBuf = Buffer.from(password);
+    const adminBuf = Buffer.from(adminPassword);
+    if (pwdBuf.length !== adminBuf.length || !timingSafeEqual(pwdBuf, adminBuf)) {
       res.status(401).json({ error: "Invalid password" });
       return;
     }

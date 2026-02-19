@@ -20,7 +20,7 @@ Full-stack GraphRAG system for Brazilian STJ jurisprudence. Ingests open data fr
 
 ## Critical Rules
 
-- `server/_core/` files are editable (self-hosted, Manus decoupled) but keep changes minimal
+- `server/_core/` files are editable (self-hosted, no third-party platform dependencies) but keep changes minimal
 - `.env` is gitignored. Required vars: `DATABASE_URL`, `JWT_SECRET`, `ADMIN_PASSWORD`, `GEMINI_API_KEY`, `QDRANT_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`
 - Env validation runs at startup — missing required vars in production cause `process.exit(1)`
 
@@ -113,12 +113,12 @@ Home (dashboard), Datasets, Documents, Graph (visualization), Query (RAG chat), 
 
 Required: `DATABASE_URL`, `JWT_SECRET`, `ADMIN_PASSWORD`, `GEMINI_API_KEY`, `QDRANT_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`
 
-Optional: `QDRANT_API_KEY`, `NODE_ENV`, `PORT`
+Optional: `QDRANT_API_KEY`, `REDIS_URL`, `NODE_ENV`, `PORT`
 
 ## Deployment
 
 - `Dockerfile` — multi-stage build (pnpm 10, HEALTHCHECK, STOPSIGNAL)
-- `docker-compose.yml` — MySQL 8 + App + Qdrant (healthchecks, service_healthy depends_on)
+- `docker-compose.yml` — MySQL 8 + Qdrant + Redis 7 + App (healthchecks, service_healthy depends_on)
 - `.github/workflows/ci.yml` — GitHub Actions (test + typecheck + build)
 - `railway.toml` — Railway deploy config (/health healthcheck)
 - **Live:** `https://stj-rag-production.up.railway.app` (MySQL + Qdrant Cloud + Supabase)
