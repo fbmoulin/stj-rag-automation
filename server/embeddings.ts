@@ -317,9 +317,6 @@ export async function storeChunks(
   return { stored, errors };
 }
 
-/** @deprecated Use storeChunks instead */
-export const storeChunksInChroma = storeChunks;
-
 /** Query Qdrant for similar documents */
 export async function queryCollection(
   collectionName: string,
@@ -357,9 +354,6 @@ export async function queryCollection(
     distances: hits.map((h: any) => (h.score !== null ? h.score : Number.MAX_VALUE)),
   };
 }
-
-/** @deprecated Use queryCollection instead */
-export const queryChroma = queryCollection;
 
 /** Query multiple collections and merge results */
 export async function queryMultipleCollections(

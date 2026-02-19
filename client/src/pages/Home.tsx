@@ -130,7 +130,7 @@ export default function Home() {
             <PipelineStep
               step="5"
               label="Geração de Embeddings"
-              description="Vetorizar chunks e armazenar no ChromaDB"
+              description="Vetorizar chunks e armazenar no Qdrant"
               status={s.resources > 0 ? "done" : "pending"}
             />
             <PipelineStep

@@ -62,12 +62,12 @@ describe("processDocument", () => {
   });
 
   it("updates document status to error on failure", async () => {
-    mockStoreChunks.mockRejectedValueOnce(new Error("ChromaDB down"));
+    mockStoreChunks.mockRejectedValueOnce(new Error("storeChunks error"));
     const buffer = Buffer.from("Algum texto.");
 
     await expect(
       processDocument(1, buffer, "text/plain", "doc.txt", "coll")
-    ).rejects.toThrow("ChromaDB down");
+    ).rejects.toThrow("storeChunks error");
 
     expect(mockUpdateDoc).toHaveBeenCalledWith(1, expect.objectContaining({ status: "error" }));
   });
