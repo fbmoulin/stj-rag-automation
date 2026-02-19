@@ -10,7 +10,7 @@ import { logger } from "./logger";
 import { getMetricsSnapshot } from "./metrics";
 import { createSessionToken } from "./auth";
 import { getSessionCookieOptions } from "./cookies";
-import { ONE_YEAR_MS, COOKIE_NAME } from "@shared/const";
+import { THIRTY_DAYS_MS, COOKIE_NAME } from "@shared/const";
 import { startWorkers, stopWorkers } from "../queue/worker";
 import { closeQueues } from "../queue/queues";
 import { closeRedis } from "../queue/connection";
@@ -52,7 +52,7 @@ async function startServer() {
     }
     const token = await createSessionToken();
     const cookieOptions = getSessionCookieOptions(req);
-    res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+    res.cookie(COOKIE_NAME, token, { ...cookieOptions, maxAge: THIRTY_DAYS_MS });
     res.json({ ok: true });
   });
 

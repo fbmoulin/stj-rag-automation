@@ -1,73 +1,44 @@
 # STJ RAG Automation
 
-Projeto para ingestão, extração e consulta semântica de dados jurídicos do STJ (GraphRAG + RAG).
+Full-stack GraphRAG system for Brazilian STJ jurisprudence. Ingests open data from STJ's CKAN API, builds a knowledge graph, generates Gemini embeddings, and provides a chat-based RAG query interface.
 
-Principais componentes
+## Stack
 
-- Backend (Express + tRPC): ingestão, processamento, embeddings, armazenamento vetorial (Qdrant).
-- Frontend (Vite + React): dashboard, uploads, consultas RAG.
-- Storage: storage proxy (BUILT_IN_FORGE) ou S3.
-- Observability: logs (pino) + /metrics (Prometheus format).
+- **Frontend:** React 19 + Vite 7 + shadcn/ui + wouter + tRPC client
+- **Backend:** Express 4 + tRPC 11 + Drizzle ORM + MySQL 8 + BullMQ
+- **Vector store:** Qdrant (sole vector store)
+- **Embeddings:** Gemini `gemini-embedding-001` (768d)
+- **Auth:** JWT password-based (`jose`) + cookie sessions (30d, sameSite: lax)
+- **Storage:** Supabase Storage (S3-compatible)
+- **Observability:** Pino structured logs + `/metrics` (Prometheus format) + `/health`
+- **CI/CD:** GitHub Actions (test + typecheck + build)
 
-Quick start (desenvolvimento)
+## Quick Start
 
-1. Instalar dependências:
+```bash
+pnpm install          # Install dependencies
+pnpm dev              # Dev server (http://localhost:3000)
+pnpm test             # Run all tests (59 passing, 10 suites)
+pnpm run check        # TypeScript type check (0 errors)
+pnpm build            # Build for production
+```
 
-   pnpm install
+## Production
 
-2. Rodar em dev:
+```bash
+NODE_ENV=production node dist/index.js
+```
 
-   pnpm dev
+Or via Docker:
 
-3. Testes (58 passing, 10 suites):
+```bash
+docker compose up --build
+```
 
-   pnpm test
+## Tests (59 passing, 10 suites)
 
-4. Typecheck:
-
-   pnpm run check
-
-Build e produção
-
-1. Build:
-
-   pnpm build
-
-2. Start (produção):
-
-   NODE_ENV=production node dist/index.js
-
-Scripts úteis
-
-- `pnpm qdrant:test-ingest` — teste de ingest em Qdrant (usa GEMINI_API_KEY)
-- `pnpm qdrant:import` — importa JSON de embeddings para Qdrant (scripts/qdrant_import.ts)
-- `pnpm tsx scripts/gemini_gcs_batch.ts <input.txt> <collection>` — executa fluxo async batch via GCS (requer SA/GCP envs)
-- `pnpm tsx scripts/setup_gcp_bucket.ts <GCP_PROJECT>` — cria bucket e service account via gcloud (requer gcloud autenticado)
-- `pnpm tsx scripts/gemini_async_probe.ts` — testa formatos/payloads do endpoint asyncBatchEmbedContent
-
-Principais endpoints
-
-- GET /metrics — Prometheus-format metrics
-- /api/trpc — tRPC API
-- /api/oauth/callback — OAuth callback
-
-Vetor store
-
-- O projeto usa Qdrant como vetor store persistente.
-- Para rodar localmente via docker-compose: `docker-compose up --build` (inclui service `qdrant`).
-- Defina `QDRANT_URL=http://qdrant:6333` e `QDRANT_API_KEY` se necessário.
-
-Async batch embeddings
-
-- Para batch assíncrono (recomendado para grandes volumes) usamos a API asyncBatchEmbedContent com GCS.
-- Veja `scripts/gemini_gcs_batch.ts` e `scripts/setup_gcp_bucket.ts` — ambos requerem credenciais GCP.
-
-Testes
-
-O projeto possui 58 testes unitários passando em 10 suites:
-
-| Suite | Testes | Tipo |
-|-------|:------:|------|
+| Suite | Tests | Type |
+|-------|:-----:|------|
 | chunker.test.ts | 15 | Pure functions |
 | entity-extractor.test.ts | 9 | Mock LLM |
 | graph-engine.test.ts | 9 | Pure + Mock DB |
@@ -75,15 +46,50 @@ O projeto possui 58 testes unitários passando em 10 suites:
 | document-processor.test.ts | 6 | Mock DB + embeddings |
 | stj-extractor.test.ts | 5 | Static data |
 | vector/qdrant.test.ts | 3 | Mock fetch |
-| storage.test.ts | 3 | Mock fetch + ENV |
-| auth.logout.test.ts | 1 | Existing |
-| embeddings.test.ts | 1 | Needs GEMINI_API_KEY |
+| storage.test.ts | 3 | Mock Supabase |
+| embeddings.test.ts | 2 | Mock fetch + retry |
+| auth.logout.test.ts | 1 | Cookie clearing |
 
-Deploy
+## Key Endpoints
 
-Ver `DEPLOY_PLAN.md` para o plano de deploy detalhado (migrations, infra, rollback).
+- `GET /health` — Health check (used by Docker HEALTHCHECK and Railway)
+- `GET /metrics` — Prometheus-format metrics
+- `POST /api/auth/login` — Password-based login
+- `/api/trpc` — tRPC API (all business logic)
 
-Contribuição
+## Environment Variables
 
-- Siga o padrão de commits e crie PRs pequenos e testados.
-- Atualize `todo.md` ao completar tasks.
+| Variable | Required | Description |
+|----------|:--------:|-------------|
+| `DATABASE_URL` | Yes | MySQL connection string |
+| `JWT_SECRET` | Yes | JWT signing secret |
+| `ADMIN_PASSWORD` | Yes | Login password |
+| `GEMINI_API_KEY` | Yes | Gemini embeddings API key |
+| `QDRANT_URL` | Yes | Qdrant vector store URL |
+| `QDRANT_API_KEY` | No | Qdrant auth token |
+| `SUPABASE_URL` | Yes | Supabase project URL |
+| `SUPABASE_SERVICE_KEY` | Yes | Supabase service role key |
+
+## Scripts
+
+- `pnpm qdrant:test-ingest` — Test ingest to Qdrant (uses GEMINI_API_KEY)
+- `pnpm qdrant:import` — Import JSON embeddings to Qdrant
+- `pnpm tsx scripts/gemini_gcs_batch.ts <input> <collection>` — Async batch embeddings via GCS
+
+## Architecture
+
+See `CLAUDE.md` for full architecture documentation.
+
+## Deploy
+
+See `DEPLOY_PLAN.md` for the detailed deploy plan (Docker, Railway, migrations, rollback).
+
+## Recent Changes (v1.0.1)
+
+- Replaced Manus platform dependencies with self-hosted auth (JWT), storage (Supabase), LLM (Gemini direct)
+- Removed ChromaDB — Qdrant is the sole vector store
+- Added BullMQ async pipeline for resource/document processing
+- Hardened security: timing-safe password comparison, Supabase error handling, 30d session duration, sameSite: lax cookies
+- Added DB indexes, combined dashboard stats query, RAG rate limiting
+- Added /health endpoint, graceful shutdown, env validation, .dockerignore
+- Fixed 12 TS errors, upload limits, storage null crash

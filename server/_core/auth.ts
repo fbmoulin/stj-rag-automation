@@ -3,6 +3,7 @@ import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
+import { logger } from "./logger";
 
 const now = new Date(0);
 
@@ -27,7 +28,7 @@ function getSecret(): Uint8Array {
 export async function createSessionToken(): Promise<string> {
   return new SignJWT({ sub: "admin" })
     .setProtectedHeader({ alg: "HS256" })
-    .setExpirationTime("365d")
+    .setExpirationTime("30d")
     .sign(getSecret());
 }
 
@@ -38,7 +39,8 @@ export async function verifySessionToken(req: Request): Promise<User | null> {
   try {
     await jwtVerify(token, getSecret());
     return ADMIN_USER;
-  } catch {
+  } catch (error) {
+    logger.debug({ error }, "JWT verification failed");
     return null;
   }
 }

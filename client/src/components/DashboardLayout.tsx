@@ -79,7 +79,8 @@ export default function DashboardLayout({
       }
       setPassword("");
       await refresh();
-    } catch {
+    } catch (error) {
+      console.error("Login failed:", error);
       setLoginError("Erro ao conectar. Tente novamente.");
     } finally {
       setLoginLoading(false);
