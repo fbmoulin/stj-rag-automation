@@ -325,7 +325,8 @@ export async function getDashboardStats() {
       (SELECT count(*) FROM ragQueries) AS queries
   `);
 
-  const r = (rows as unknown as Record<string, unknown>[])[0];
+  const [resultRows] = rows as unknown as [Record<string, unknown>[]];
+  const r = resultRows[0];
   return {
     datasets: Number(r.datasets ?? 0),
     resources: Number(r.resources ?? 0),
