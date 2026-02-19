@@ -111,3 +111,6 @@ temp/
 
 # Git worktrees
 .worktrees/
+
+# Generated indexes
+PROJECT_INDEX.json
