@@ -90,8 +90,8 @@ export const appRouter = router({
         // Queue async job if Redis is available
         const jobId = await enqueueResourceProcess(input.resourceId);
         if (jobId) {
-          await updateResourceStatus(input.resourceId, "queued");
-          return { jobId, status: "queued" as const, resourceId: input.resourceId };
+          await updateResourceStatus(input.resourceId, "processing");
+          return { jobId, status: "processing" as const, resourceId: input.resourceId };
         }
 
         // Fallback: synchronous processing (no Redis)
@@ -167,7 +167,7 @@ export const appRouter = router({
         // Queue async job if Redis is available
         const jobId = await enqueueDocumentProcess(input.documentId);
         if (jobId) {
-          return { jobId, status: "queued" as const, documentId: input.documentId };
+          return { jobId, status: "processing" as const, documentId: input.documentId };
         }
 
         // Fallback: synchronous processing (no Redis)
