@@ -92,6 +92,7 @@ async function embedWithRetry(text: string) {
         model: "models/gemini-embedding-001",
         content: { parts: [{ text }] },
         taskType: "RETRIEVAL_DOCUMENT",
+        outputDimensionality: 768,
       };
       const res = await fetch(url, {
         method: "POST",

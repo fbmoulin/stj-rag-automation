@@ -151,7 +151,17 @@ export async function extractEntitiesFromChunk(chunk: TextChunk): Promise<Extrac
 
     return { entities, relationships };
   } catch (error: any) {
-    logger.error({ err: String(error) }, "[EntityExtractor] Extraction failed:");
+    const msg = String(error);
+    // Re-throw transient errors so the job can retry
+    const isTransient = msg.includes("429") || msg.includes("503") || msg.includes("502") ||
+                        msg.includes("ECONNREFUSED") || msg.includes("ETIMEDOUT") ||
+                        msg.includes("fetch failed") || msg.includes("network");
+    if (isTransient) {
+      logger.warn({ err: msg, chunkIndex: chunk.index }, "[EntityExtractor] Transient error — will retry");
+      throw error;
+    }
+    // Permanent errors (JSON parse, validation, etc.) — return empty and continue
+    logger.error({ err: msg, chunkIndex: chunk.index }, "[EntityExtractor] Extraction failed (permanent):");
     return { entities: [], relationships: [] };
   }
 }

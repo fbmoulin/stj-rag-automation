@@ -15,6 +15,9 @@ import pLimit from "p-limit";
 import { randomUUID } from "crypto";
 
 const EMBEDDING_PROVIDER = (process.env.EMBEDDING_PROVIDER || "gemini").toLowerCase();
+if (!["gemini", "local"].includes(EMBEDDING_PROVIDER)) {
+  throw new Error(`Invalid EMBEDDING_PROVIDER: "${EMBEDDING_PROVIDER}". Must be "gemini" or "local".`);
+}
 const LOCAL_EMBEDDING_URL = (process.env.LOCAL_EMBEDDING_URL || "http://localhost:8100").replace(/\/$/, "");
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";

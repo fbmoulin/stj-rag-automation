@@ -11,6 +11,7 @@ import { logger } from "./logger";
 import { getMetricsSnapshot } from "./metrics";
 import { createSessionToken } from "./auth";
 import { getSessionCookieOptions } from "./cookies";
+import { parse as parseCookieHeader } from "cookie";
 import { THIRTY_DAYS_MS, COOKIE_NAME } from "@shared/const";
 import { startWorkers, stopWorkers } from "../queue/worker";
 import { closeQueues } from "../queue/queues";
@@ -39,6 +40,7 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 
 async function startServer() {
   const app = express();
+  app.set("trust proxy", 1);
   const server = createServer(app);
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
@@ -80,8 +82,13 @@ async function startServer() {
     });
   });
 
-  // Metrics endpoint (Prometheus text format)
-  app.get("/metrics", (_req, res) => {
+  // Metrics endpoint (Prometheus text format) — requires authentication
+  app.get("/metrics", (req, res) => {
+    const cookies = parseCookieHeader(req.headers.cookie || "");
+    if (!cookies[COOKIE_NAME]) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
     res.setHeader("Content-Type", "text/plain; version=0.0.4");
     res.status(200).send(formatPrometheusMetrics());
   });

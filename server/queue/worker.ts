@@ -128,7 +128,13 @@ async function handleDocumentProcess(job: Job<DocumentProcessJob>): Promise<void
   if (!doc) throw new Error(`Document not found: ${documentId}`);
 
   await job.updateProgress(10);
-  const response = await fetch(doc.fileUrl!);
+  if (!doc.fileUrl) {
+    throw new Error(`Document ${documentId} has no fileUrl — upload may have failed`);
+  }
+  const response = await fetch(doc.fileUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch document ${documentId}: HTTP ${response.status} ${response.statusText}`);
+  }
   const buffer = Buffer.from(await response.arrayBuffer());
 
   await job.updateProgress(30);
