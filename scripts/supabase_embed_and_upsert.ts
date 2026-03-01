@@ -33,6 +33,9 @@ if (!inputPath) {
   process.exit(2);
 }
 
+const EMBEDDING_PROVIDER = (process.env.EMBEDDING_PROVIDER || "gemini").toLowerCase();
+const LOCAL_EMBEDDING_URL = (process.env.LOCAL_EMBEDDING_URL || "http://localhost:8100").replace(/\/$/, "");
+
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_EMBED_URL = process.env.GEMINI_EMBED_URL || "";
 const QDRANT_URL = (process.env.QDRANT_URL || "http://localhost:6333").replace(/\/$/, "");
@@ -42,8 +45,8 @@ const MAX_RETRIES = Number(process.env.EMBEDDING_MAX_RETRIES || 3);
 const RETRY_BASE_MS = Number(process.env.EMBEDDING_RETRY_BASE_MS || 300);
 const CONCURRENCY = Number(process.env.EMBEDDING_CONCURRENCY || 4);
 
-if (!GEMINI_API_KEY) {
-  console.error("Missing GEMINI_API_KEY in env");
+if (EMBEDDING_PROVIDER === "gemini" && !GEMINI_API_KEY) {
+  console.error("Missing GEMINI_API_KEY in env (required when EMBEDDING_PROVIDER=gemini)");
   process.exit(1);
 }
 
@@ -51,7 +54,27 @@ function sleep(ms: number) {
   return new Promise((res) => setTimeout(res, ms));
 }
 
+async function localEmbed(texts: string[]): Promise<number[][]> {
+  const prefixed = texts.map((t) => (t.startsWith("passage: ") ? t : "passage: " + t));
+  const res = await fetch(`${LOCAL_EMBEDDING_URL}/embeddings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ texts: prefixed, normalize: true }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`local embed failed ${res.status} ${body}`);
+  }
+  const data = await res.json();
+  return data.embeddings;
+}
+
 async function embedWithRetry(text: string) {
+  if (EMBEDDING_PROVIDER === "local") {
+    const [vector] = await localEmbed([text]);
+    return vector;
+  }
+
   let attempt = 0;
   while (true) {
     try {

@@ -1,5 +1,11 @@
 /**
- * Embeddings Service - Generates embeddings via Gemini API and stores in Qdrant
+ * Embeddings Service - Generates embeddings via Gemini API or local GPU service, stores in Qdrant
+ *
+ * Provider selection via EMBEDDING_PROVIDER env var:
+ *   - "gemini" (default): uses Gemini API (requires GEMINI_API_KEY)
+ *   - "local": uses local GPU service (requires LOCAL_EMBEDDING_URL, default http://localhost:8100)
+ *
+ * NOTE: Switching providers requires re-indexing — vector spaces are incompatible.
  */
 import type { TextChunk } from "./chunker";
 import { logger } from "./_core/logger";
@@ -7,6 +13,9 @@ import { incMetric, recordTiming } from "./_core/metrics";
 import { ensureCollection as ensureQdrantCollection, upsertPoints as qdrantUpsertPoints, searchCollection as qdrantSearchCollection } from "./vector/qdrant";
 import pLimit from "p-limit";
 import { randomUUID } from "crypto";
+
+const EMBEDDING_PROVIDER = (process.env.EMBEDDING_PROVIDER || "gemini").toLowerCase();
+const LOCAL_EMBEDDING_URL = (process.env.LOCAL_EMBEDDING_URL || "http://localhost:8100").replace(/\/$/, "");
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_EMBED_URL =
@@ -42,8 +51,35 @@ export async function fetchWithRetry(input: RequestInfo, init?: RequestInit): Pr
   throw lastError || new Error("fetchWithRetry failed");
 }
 
-/** Generate embedding for a single text using Gemini API */
-export async function generateEmbedding(text: string): Promise<number[]> {
+// ---------------------------------------------------------------------------
+// Local GPU provider helpers
+// ---------------------------------------------------------------------------
+
+async function localGenerateEmbeddings(texts: string[], taskType: "document" | "query"): Promise<number[][]> {
+  // intfloat/multilingual-e5-base requires prefix: "query: " for queries, "passage: " for documents
+  const prefix = taskType === "query" ? "query: " : "passage: ";
+  const prefixedTexts = texts.map((t) => (t.startsWith(prefix) ? t : prefix + t));
+
+  const startMs = Date.now();
+  const res = await fetchWithRetry(`${LOCAL_EMBEDDING_URL}/embeddings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ texts: prefixedTexts, normalize: true }),
+  });
+  recordTiming("embedding_local_request_ms", Date.now() - startMs);
+
+  const body = await res.json();
+  if (!Array.isArray(body.embeddings) || body.embeddings.length !== texts.length) {
+    throw new Error(`Local embedding returned ${body.embeddings?.length ?? 0} vectors for ${texts.length} texts`);
+  }
+  return body.embeddings;
+}
+
+// ---------------------------------------------------------------------------
+// Gemini provider helpers
+// ---------------------------------------------------------------------------
+
+async function geminiGenerateEmbedding(text: string): Promise<number[]> {
   if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
   const payload = {
@@ -66,11 +102,31 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   return data.embedding?.values || [];
 }
 
-/** Generate embeddings for a batch of texts using Gemini API */
-export async function generateBatchEmbeddings(texts: string[]): Promise<number[][]> {
+async function geminiGenerateQueryEmbedding(text: string): Promise<number[]> {
   if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
-  if (texts.length === 0) return [];
-  incMetric("embedding_batch_jobs_started");
+
+  const payload = {
+    model: "models/gemini-embedding-001",
+    content: { parts: [{ text }] },
+    taskType: "RETRIEVAL_QUERY",
+    outputDimensionality: EMBEDDING_DIMENSION,
+  };
+
+  const res = await fetchWithRetry(GEMINI_EMBED_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": GEMINI_API_KEY,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+  return data.embedding?.values || [];
+}
+
+async function geminiBatchEmbeddings(texts: string[]): Promise<number[][]> {
+  if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
   // Try synchronous batchEmbedContents first
   try {
@@ -94,25 +150,23 @@ export async function generateBatchEmbeddings(texts: string[]): Promise<number[]
       const body = await res.json().catch(() => null);
       const embeddings = body?.embeddings;
       if (Array.isArray(embeddings) && embeddings.length === texts.length) {
-        incMetric("embedding_batch_jobs_succeeded");
         return embeddings.map((e: any) => e.values || []);
       }
     }
   } catch (err: any) {
     logger.warn({ err: String(err) }, "batchEmbedContents failed");
   }
-  incMetric("embedding_batch_jobs_failed_async");
+
   logger.warn("batchEmbedContents did not produce a complete result; falling back to per-item embeddings");
 
-  // Per-item embedding fallback with concurrency and retries
+  // Per-item fallback
   const limit = pLimit(EMBEDDING_CONCURRENCY);
   const results: (number[] | null)[] = await Promise.all(
     texts.map((text, idx) =>
       limit(async () => {
         for (let attempt = 1; attempt <= Math.max(1, MAX_RETRIES); attempt++) {
           try {
-            const emb = await generateEmbedding(text);
-            return emb;
+            return await geminiGenerateEmbedding(text);
           } catch (err: any) {
             logger.warn({ attempt, err: String(err), index: idx }, "per-item embedding failed, retrying");
             if (attempt < Math.max(1, MAX_RETRIES)) {
@@ -131,13 +185,52 @@ export async function generateBatchEmbeddings(texts: string[]): Promise<number[]
 
   const failed = results.filter((r) => r === null).length;
   if (failed > 0) {
-    logger.error({ failed, total: texts.length }, "per-item fallback encountered failures");
-    incMetric("embedding_batch_jobs_failed_per_item");
     throw new Error(`Per-item fallback failed for ${failed}/${texts.length} items`);
   }
-
-  incMetric("embedding_batch_fallback_per_item_used");
   return results.map((r) => r as number[]);
+}
+
+// ---------------------------------------------------------------------------
+// Public API — routes to the configured provider
+// ---------------------------------------------------------------------------
+
+/** Generate embedding for a single text */
+export async function generateEmbedding(text: string): Promise<number[]> {
+  if (EMBEDDING_PROVIDER === "local") {
+    const [embedding] = await localGenerateEmbeddings([text], "document");
+    return embedding;
+  }
+  return geminiGenerateEmbedding(text);
+}
+
+/** Generate embedding for a query (uses RETRIEVAL_QUERY task type / "query: " prefix) */
+export async function generateQueryEmbedding(text: string): Promise<number[]> {
+  if (EMBEDDING_PROVIDER === "local") {
+    const [embedding] = await localGenerateEmbeddings([text], "query");
+    return embedding;
+  }
+  return geminiGenerateQueryEmbedding(text);
+}
+
+/** Generate embeddings for a batch of texts */
+export async function generateBatchEmbeddings(texts: string[]): Promise<number[][]> {
+  if (texts.length === 0) return [];
+  incMetric("embedding_batch_jobs_started");
+
+  try {
+    let result: number[][];
+    if (EMBEDDING_PROVIDER === "local") {
+      // Local GPU service handles batching internally — no per-item fallback needed
+      result = await localGenerateEmbeddings(texts, "document");
+    } else {
+      result = await geminiBatchEmbeddings(texts);
+    }
+    incMetric("embedding_batch_jobs_succeeded");
+    return result;
+  } catch (err: any) {
+    incMetric("embedding_batch_jobs_failed_per_item");
+    throw err;
+  }
 }
 
 /** Store chunks with embeddings in Qdrant */
@@ -201,26 +294,7 @@ export async function queryCollection(
   metadatas: Record<string, any>[];
   distances: number[];
 }> {
-  if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
-
-  const payload = {
-    model: "models/gemini-embedding-001",
-    content: { parts: [{ text: queryText }] },
-    taskType: "RETRIEVAL_QUERY",
-    outputDimensionality: EMBEDDING_DIMENSION,
-  };
-
-  const response = await fetchWithRetry(GEMINI_EMBED_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": GEMINI_API_KEY,
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await response.json();
-  const queryEmbedding = data.embedding?.values || [];
+  const queryEmbedding = await generateQueryEmbedding(queryText);
 
   const hits = await qdrantSearchCollection(collectionName, queryEmbedding, nResults, true);
   return {
