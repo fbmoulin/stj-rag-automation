@@ -19,6 +19,7 @@ import {
 
 // Services
 import { syncDatasets, downloadResource, getStaticDatasetList } from "./stj-extractor";
+import { listTemas, getThemeDetail, getStats, getLastScanResult, checkHealth } from "./suspension-client";
 import { getCollectionStats, listCollections } from "./embeddings";
 import { buildCommunities, getGraphVisualizationData } from "./graph-engine";
 import { graphRAGQuery } from "./graphrag-query";
@@ -239,6 +240,27 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => {
         return getRecentRagQueries(ctx.user.id, input?.limit || 20);
       }),
+  }),
+  // ─── Suspension (MCP) ────────────────────────────────────────────────────────
+  suspension: router({
+    temas: publicProcedure.query(async () => {
+      const raw = await listTemas("TODOS", "json");
+      return JSON.parse(raw);
+    }),
+    detail: publicProcedure
+      .input(z.object({ numero: z.number() }))
+      .query(async ({ input }) => {
+        return getThemeDetail(input.numero);
+      }),
+    stats: publicProcedure.query(async () => {
+      return getStats();
+    }),
+    lastScan: publicProcedure.query(async () => {
+      return getLastScanResult();
+    }),
+    health: publicProcedure.query(async () => {
+      return checkHealth();
+    }),
   }),
 });
 
